@@ -21,24 +21,42 @@ curve(pos=[vector(0,0,0), vector(10,0,0)], color=color.red)    # X-Achse
 curve(pos=[vector(0,0,0), vector(0,10,0)], color=color.green)  # Y-Achse
 curve(pos=[vector(0,0,0), vector(0,0,10)], color=color.blue)   # Z-Achse
 
-class LegoBrick:
-    # v0.2 / 3.11.24 / beiti
+class BrickProject:
+    # v0.1 / 11.11.24 / beiti
+    # planned use:
+    # - load project file
+    # - instantiate and contain BrickScenes
+    # - save renders
+    pass
+
+class BrickScene:
+    # v0.1 / 11.11.24 / beiti
+    # planned use:
+    # hold individual scenes consisting of multiple bricks + optional camera / render / view setting
+    # render full scene, possibly some more options
+
+    def __init__(self, bricks = [], automatic_camera = True, automatic_scene = True, camera_position = vector(0, 0, 0), scene_center = vector (0, 0, 0)):
+        self.bricks = bricks
+        if not automatic_camera or automatic_scene:
+            self.set_camera_and_scene(automatic_camera, automatic_scene, camera_position, scene_center)
+
+    def set_camera_and_scene(automatic_camera, automatic_scene, camera_position, scene_center):
+        pass
+
+    def add_brick(self, brick):
+        self.bricks.append(brick)
+
+class BasicBrick:
+    # v0.1 / 11.11.24 / beiti
     #
     # PARAMETER:
     # ==========
-    # length, width, height = int
-    # x, y, z = int
-    # color = VPython Farbcode
     # type = lego/duplo
+    # color = VPython color code
     #
-    # Alle Endangaben in Millimetern
-    #
-    # TO DO: 
-    #   - Unterseite vom Stein modellieren
-    #   - Farbcodes offener wählen, um Render-Engine flexibel zu halten
-    #   - Scene-Standardwerte an Klasse übergeben, sofern vorhanden
-    #   - Sonderformen definieren
-    # mm-Faktoren für Lego und Duplo
+    # SPECS:
+    # ======
+    # generic lego/duplo for all bricks, in mm
 
     BRICK_SPECS = {
         "lego": {
@@ -51,10 +69,12 @@ class LegoBrick:
             "stud_wall_thickness": 0,
             "is_hollow": False
         },
+
+        # due to likely render issues, stud diameter is reduced by half of wall thickness
         "duplo": {
             "xy_factor": 15.6,
             "z_factor": 19.2,
-            "stud_diameter": 8.6,
+            "stud_diameter": 8.5,
             "stud_height": 3.6,
             "stud_xy_offset": 7.8,
             "stud_spacing": 16,
@@ -62,13 +82,37 @@ class LegoBrick:
             "is_hollow": True           
         }
     }
+        
+    def __init__(self, type):
+        self.type = type
+        self.specs = self.BRICK_SPECS[type]
 
-    def __init__(self, length=4, width=2, height=1, x=0, y=0, z=0, color=color.red, type="lego"):
-        self.type=type
-        self.specs = self.BRICK_SPECS[self.type]
+class RectangularBrick(BasicBrick):
+    # v0.2 / 3.11.24 / beiti
+    #
+    # changes: inheritance, rename
+    #
+    # PARAMETER:
+    # ==========
+    # length, width, height = int
+    # x, y, z = int
+    # color = VPython Farbcode
+    # type = lego/duplo
+    #
+    #
+    # TO DO: 
+    #   - Unterseite vom Stein modellieren
+    #   - Farbcodes offener wählen, um Render-Engine flexibel zu halten
+    #   - Scene-Standardwerte an Klasse übergeben, sofern vorhanden
+    #   - Sonderformen definieren
+    #   - separate brick-objects from brick-renders (?)
 
-        self.spalten = width
-        self.reihen = length
+
+
+    def __init__(self, type, length=4, width=2, height=1, x=0, y=0, z=0, color=color.red):
+        super().__init__(type)
+        self.columns = width
+        self.rows = length
 
         self.length = length * self.specs["xy_factor"]
         self.width = width * self.specs["xy_factor"]
@@ -108,7 +152,7 @@ class LegoBrick:
             return cyl_extruded
 
     def generate(self):
-        legoBasis = box(
+        brick_basis = box(
             pos = vec(
                 self.x + self.length/2, 
                 self.y + self.width/2, 
@@ -120,16 +164,16 @@ class LegoBrick:
             color = self.color,
             up = vector(0,0,1))
 
-        brickComponents = [legoBasis]
-        for i in range(int(self.reihen)):
-            for j in range(int(self.spalten)):
-                mitteStud = vec(
+        brickComponents = [brick_basis]
+        for i in range(int(self.rows)):
+            for j in range(int(self.columns)):
+                stud_center = vec(
                     self.x + self.specs["stud_xy_offset"] + (i * self.specs["stud_spacing"]),
                     self.y + self.specs["stud_xy_offset"] + (j * self.specs["stud_spacing"]),
                     self.z + self.height)
 
                 stud = self.generate_stud(
-                    pos = mitteStud,
+                    pos = stud_center,
                     hollow = self.specs["is_hollow"],
                     wall_thickness = self.specs["stud_wall_thickness"]
                 )
@@ -138,11 +182,5 @@ class LegoBrick:
 
         return compound(brickComponents)
 
-brick1 = LegoBrick(2, 8, 1, 0, 0, 0, color.yellow, "duplo")
-# brick2 = LegoBrick(2, 8, 1, 6, 0, 0, color.yellow, "duplo")
-brick3 = LegoBrick(2, 4, 1, 2, 0, 0, color.red, "duplo")
-brick4 = LegoBrick(4, 2, 1, 1, 0, 1, color.blue, "duplo")
-brick5 = LegoBrick(4, 2, 1, 1, 2, 1, color.green, "duplo")
-brick6 = LegoBrick(2, 4, 1, -2, 0, 0, color.red, "duplo")
-brick7 = LegoBrick(2, 8, 1, -1, 0, 1,color.yellow, "duplo")
-brick8 = LegoBrick(2, 4, 1, 0, 0, 2, color.red, "duplo")
+brick1 = RectangularBrick("duplo", 2, 8, 1, 0, 0, 0, color.yellow)
+
