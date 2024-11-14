@@ -25,9 +25,14 @@ class BrickProject:
     # v0.1 / 11.11.24 / beiti
     # planned use:
     # - load project file
-    # - instantiate and contain BrickScenes
-    # - save renders
-    pass
+    # - save renders?
+    #
+    # so far implemented:
+    # - define brick type, hold BrickScenes
+    
+    def __init__(self, type):
+        self.brick_scenes = []
+        self.type = type
 
 class BrickScene:
     # v0.1 / 11.11.24 / beiti
@@ -57,6 +62,7 @@ class BasicBrick:
     # SPECS:
     # ======
     # generic lego/duplo for all bricks, in mm
+    # calculate z
 
     BRICK_SPECS = {
         "lego": {
@@ -183,4 +189,5 @@ class RectangularBrick(BasicBrick):
         return compound(brickComponents)
 
 brick1 = RectangularBrick("duplo", 2, 8, 1, 0, 0, 0, color.yellow)
+brick2 = RectangularBrick("duplo", 2, 8, 1, 4, 0, 0, color.yellow)
 
