@@ -3,23 +3,10 @@
 
 from vpython import *
 
-# Scene mit  Standardwerten
-scene = canvas(
-    width=800,            # Fensterbreite
-    height=600,           # Fensterhöhe
-    center=vector(0,0,0), # Mittelpunkt der Scene
-    background=color.cyan,  # Hellgrauer Hintergrund
-    up=vector(0,0,1)     # Z ist "oben"
-)
-
-# Kamera mittig von oben/vorne
-scene.camera.pos = vector(0,-40,30)    # Y negativ = von vorne, Z positiv = von oben
-scene.camera.axis = vector(0,40,-20)   # Schaut nach hinten und leicht nach unten
-
 # Hilfslinien zum Verstehen der Achsen
-curve(pos=[vector(0,0,0), vector(10,0,0)], color=color.red)    # X-Achse
-curve(pos=[vector(0,0,0), vector(0,10,0)], color=color.green)  # Y-Achse
-curve(pos=[vector(0,0,0), vector(0,0,10)], color=color.blue)   # Z-Achse
+# curve(pos=[vector(0,0,0), vector(10,0,0)], color=color.red)    # X-Achse
+# curve(pos=[vector(0,0,0), vector(0,10,0)], color=color.green)  # Y-Achse
+# curve(pos=[vector(0,0,0), vector(0,0,10)], color=color.blue)   # Z-Achse
 
 class BrickProject:
     # v0.1 / 11.11.24 / beiti
@@ -34,19 +21,45 @@ class BrickProject:
         self.brick_scenes = []
         self.type = type
 
+    def add_scene(self, special_canvas=None, special_camera=None):
+        brick_scene = BrickScene(special_canvas, special_camera)
+        self.brick_scenes.append(brick_scene)
+
 class BrickScene:
     # v0.1 / 11.11.24 / beiti
     # planned use:
     # hold individual scenes consisting of multiple bricks + optional camera / render / view setting
     # render full scene, possibly some more options
+    #
+    # to do:
+    # - camera object
+    # - camera calculation
+    # - special scenes
+    # 
 
-    def __init__(self, bricks = [], automatic_camera = True, automatic_scene = True, camera_position = vector(0, 0, 0), scene_center = vector (0, 0, 0)):
-        self.bricks = bricks
-        if not automatic_camera or automatic_scene:
-            self.set_camera_and_scene(automatic_camera, automatic_scene, camera_position, scene_center)
+    # Parameter description:
+    # special_camera = camera object for manual positioning of camera for scene
+    # special_scene = scene details (width, height, ...) -> new obect?
+    def __init__(self, special_scene=None, special_camera=None):
+        self.bricks = []
+        self.scene = None
+        self.scene = self.set_scene(special_scene, special_camera)
 
-    def set_camera_and_scene(automatic_camera, automatic_scene, camera_position, scene_center):
-        pass
+    def set_scene(self, special_scene=None, special_camera=None):
+        # Scene with std values
+        # special scene/camera not yet implemented
+
+        self.scene = canvas(
+            width=800,            # window width
+            height=600,           # window height
+            center=vector(0,0,0), # Scene center
+            background=color.cyan,  # bg color
+            up=vector(0,0,1)     # Z is "up"
+        )
+
+        # Kamera mittig von oben/vorne
+        self.scene.camera.pos = vector(0,-40,30)    # Y negativ = von vorne, Z positiv = von oben
+        self.scene.camera.axis = vector(0,40,-20)   # Schaut nach hinten und leicht nach unten
 
     def add_brick(self, brick):
         self.bricks.append(brick)
@@ -188,6 +201,15 @@ class RectangularBrick(BasicBrick):
 
         return compound(brickComponents)
 
-brick1 = RectangularBrick("duplo", 2, 8, 1, 0, 0, 0, color.yellow)
-brick2 = RectangularBrick("duplo", 2, 8, 1, 4, 0, 0, color.yellow)
+schiff = BrickProject("duplo")
+
+schiff.add_scene()
+
+schiff.brick_scenes[0].add_brick(
+    RectangularBrick("duplo", 2, 8, 1, 0, 0, 0, color.yellow)
+)
+
+schiff.brick_scenes[0].add_brick(
+    RectangularBrick("duplo", 2, 8, 1, 4, 0, 0, color.yellow)
+)
 
