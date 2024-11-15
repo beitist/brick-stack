@@ -22,7 +22,7 @@ class BrickProject:
         self.type = type
 
     def add_scene(self, special_canvas=None, special_camera=None):
-        brick_scene = BrickScene(special_canvas, special_camera)
+        brick_scene = BrickScene(self.type, special_canvas, special_camera)
         self.brick_scenes.append(brick_scene)
 
 class BrickScene:
@@ -40,8 +40,9 @@ class BrickScene:
     # Parameter description:
     # special_camera = camera object for manual positioning of camera for scene
     # special_scene = scene details (width, height, ...) -> new obect?
-    def __init__(self, special_scene=None, special_camera=None):
+    def __init__(self, type, special_scene=None, special_camera=None):
         self.bricks = []
+        self.type = type
         self.scene = None
         self.scene = self.set_scene(special_scene, special_camera)
 
@@ -61,7 +62,10 @@ class BrickScene:
         self.scene.camera.pos = vector(0,-40,30)    # Y negativ = von vorne, Z positiv = von oben
         self.scene.camera.axis = vector(0,40,-20)   # Schaut nach hinten und leicht nach unten
 
+    ##### HIER KÖNNTE MAN über ADDBRICK die Klasse Init starten anstatt brick separat dann
+    ##### kann auch type besser übergeben werden. So wie oben bei Scene aus Project
     def add_brick(self, brick):
+        brick =
         self.bricks.append(brick)
 
 class BasicBrick:
@@ -128,7 +132,7 @@ class RectangularBrick(BasicBrick):
 
 
 
-    def __init__(self, type, length=4, width=2, height=1, x=0, y=0, z=0, color=color.red):
+    def __init__(self, length=4, width=2, height=1, x=0, y=0, z=0, color=color.red):
         super().__init__(type)
         self.columns = width
         self.rows = length
@@ -206,10 +210,10 @@ schiff = BrickProject("duplo")
 schiff.add_scene()
 
 schiff.brick_scenes[0].add_brick(
-    RectangularBrick("duplo", 2, 8, 1, 0, 0, 0, color.yellow)
+    RectangularBrick(2, 8, 1, 0, 0, 0, color.yellow)
 )
 
 schiff.brick_scenes[0].add_brick(
-    RectangularBrick("duplo", 2, 8, 1, 4, 0, 0, color.yellow)
+    RectangularBrick(2, 8, 1, 4, 0, 0, color.yellow)
 )
 
