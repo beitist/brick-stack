@@ -9,24 +9,31 @@ from vpython import *
 # curve(pos=[vector(0,0,0), vector(0,0,10)], color=color.blue)   # Z-Achse
 
 class BrickProject:
-    # v0.1 / 11.11.24 / beiti
+    # v0.1b / 17.11.24 / beiti
     # planned use:
-    # - load project file
+    # - load project file?
     # - save renders?
     #
-    # so far implemented:
-    # - define brick type, hold BrickScenes
+    #
+    # description
+    # type = duplo/lego
+    # auto_z = True (no further implementation yet)
     
-    def __init__(self, type):
+    def __init__(self, type, auto_z=True):
         self.brick_scenes = []
         self.type = type
+        self.auto_z = True
 
+    # special_canvas, special_camera not yet there :)
     def add_scene(self, special_canvas=None, special_camera=None):
-        brick_scene = BrickScene(self.type, special_canvas, special_camera)
+        brick_scene = BrickScene(self, special_canvas, special_camera, )
         self.brick_scenes.append(brick_scene)
 
+    def get_scene_index(self, brick_scene):
+        return self.brick_scenes.index(brick_scene)
+
 class BrickScene:
-    # v0.1 / 11.11.24 / beiti
+    # v0.1 / 17.11.24 / beiti
     # planned use:
     # hold individual scenes consisting of multiple bricks + optional camera / render / view setting
     # render full scene, possibly some more options
@@ -35,15 +42,17 @@ class BrickScene:
     # - camera object
     # - camera calculation
     # - special scenes
-    # 
+    # - z-location auto calculation
 
     # Parameter description:
     # special_camera = camera object for manual positioning of camera for scene
     # special_scene = scene details (width, height, ...) -> new obect?
-    def __init__(self, type, special_scene=None, special_camera=None):
+    # brick_scene inherits type and project
+    def __init__(self, project, special_scene=None, special_camera=None):
+        self.project = project
+        self.type = project.type
+        self.auto_z = project.auto_z
         self.bricks = []
-        self.type = type
-        self.scene = None
         self.scene = self.set_scene(special_scene, special_camera)
 
     def set_scene(self, special_scene=None, special_camera=None):
@@ -62,11 +71,69 @@ class BrickScene:
         self.scene.camera.pos = vector(0,-40,30)    # Y negativ = von vorne, Z positiv = von oben
         self.scene.camera.axis = vector(0,40,-20)   # Schaut nach hinten und leicht nach unten
 
-    ##### HIER KÖNNTE MAN über ADDBRICK die Klasse Init starten anstatt brick separat dann
-    ##### kann auch type besser übergeben werden. So wie oben bei Scene aus Project
-    def add_brick(self, brick):
-        brick =
+    def calculate_z_pos(self, length, width, height, x_pos, y_pos):
+        scene_index = self.get_my_scene_index()
+        for scene in self.project.brick_scenes:
+            # calculate all occupying points
+            # verify for each point, if z-index = 0 is occupied
+            # if 0 is occupied, start again with 2 until 
+            # all points are fine.
+            # return z
+            # dummy function!
+
+            return 0
+
+    def add_brick(self, brick_type, length, width, height, x_pos, y_pos, brick_color, z_pos=0):
+        if self.project.auto_z:
+            z_pos = self.calculate_z_pos(length, width, height, x_pos, y_pos)
+        else:
+            z_pos = z_pos
+
+        project_type = self.type
+
+        brick = BrickFactory(project_type,
+                             brick_type, 
+                             length, 
+                             width, 
+                             height, 
+                             x_pos, 
+                             y_pos, 
+                             z_pos, 
+                             brick_color)
+        
         self.bricks.append(brick)
+
+    def get_my_scene_index(self):
+        return self.project.get_scene_index(self)
+
+class BrickFactory:
+    # v0.1 / 16.11.24 / beiti
+    # generates bricks for scenes
+    
+    # space for many types of bricks
+    # needs failover if type is not implemented
+    def __init__(project_type, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
+        brick = None
+        if brick_type == 'rect':
+            brick = RectangularBrick(project_type,
+                                     length, 
+                                     width, 
+                                     height, 
+                                     x_pos, 
+                                     y_pos, 
+                                     z_pos, 
+                                     brick_color)
+        else:
+            brick = RectangularBrick(project_type,
+                                     length, 
+                                     width, 
+                                     height, 
+                                     x_pos, 
+                                     y_pos, 
+                                     z_pos, 
+                                     brick_color)
+
+        return brick
 
 class BasicBrick:
     # v0.1 / 11.11.24 / beiti
@@ -134,6 +201,7 @@ class RectangularBrick(BasicBrick):
 
     def __init__(self, length=4, width=2, height=1, x=0, y=0, z=0, color=color.red):
         super().__init__(type)
+        self.type = super().type
         self.columns = width
         self.rows = length
 
