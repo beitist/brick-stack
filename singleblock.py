@@ -4,7 +4,15 @@
 from vpython import *
 import random
 
+# Debug options
+# GLOBAL = Turn on/off all debug options
 GLOBAL_DEBUG = True
+
+# Turn on/off if needed
+CALC_DEBUG = True
+STUD_DEBUG = False
+GRID_DEBUG = False
+BRICK_DEBUG = True
 
 ##### COORDINATES #####
 ## x = length from left to right (standard camera view)
@@ -13,10 +21,17 @@ GLOBAL_DEBUG = True
 ## coordinates x, y, z correspond with l, w, h values
 #######################
 
+
+####### TO DO ########
+## 1: Auto_Camera, auto_scene
+## 2: render to file
+## 3: read simple scene files
+## 4: create booklet
+
 class BrickProject:
     """Class holding individuel scenes (= steps in constructing a brick project)
     
-    Provides functionality for file handling of simplified project files"""
+    Will (soon) provide functionality for file handling of simplified project files"""
     # v0.1c / 17.11.24 / beiti
     # planned use:
     # - load project file?
@@ -68,7 +83,7 @@ class OccupancyGrid:
         self.points = {}  # Dictionary mit (x,y) als Key
         
     def add_brick(self, x, y, z, width, length, height):
-        if GLOBAL_DEBUG: print(f"Function add_brick/OccupancyGrid: adding brick at ({x},{y}) with w={width}, l={length}")
+        if GLOBAL_DEBUG and GRID_DEBUG: print(f"Function add_brick/OccupancyGrid: adding brick at ({x},{y}) with w={width}, l={length}")
         # Für jeden Punkt, den der Stein belegt
         for dx in range(length):
             for dy in range(width):
@@ -90,7 +105,7 @@ class OccupancyGrid:
                     for z_start, z_end in self.points[point]:
                         max_height = max(max_height, z_end)
         
-        if GLOBAL_DEBUG: print(f"Max height: {max_height}")
+        if GLOBAL_DEBUG and GRID_DEBUG: print(f"Max height: {max_height}")
         
         return max_height
 
@@ -152,7 +167,7 @@ class BrickScene:
         # Runde auf nächste valide Höhe
         if self.brick_system == "duplo":
             # Runde auf Vielfaches von 0.5 (oder 3 in deinem System)
-            if GLOBAL_DEBUG: print(f"z before rounding: {z}")
+            if GLOBAL_DEBUG and (BRICK_DEBUG or GRID_DEBUG): print(f"z before rounding: {z}")
             z = ceil(z * 2) / 2
         else:  # lego
             # Runde auf Vielfaches von 1/3
@@ -166,7 +181,7 @@ class BrickScene:
         else:
             z_pos = z_pos
         
-        if GLOBAL_DEBUG:
+        if GLOBAL_DEBUG and BRICK_DEBUG:
             print(f"Call to add_brick in BrickScene:\nz-pos after get_min: {z_pos}")
             print(f"brickFactory call with: {brick_type}, l={length}, w={width}, h={height}, x={x_pos}, y={y_pos}, z={z_pos}")
 
@@ -374,7 +389,7 @@ class RectangularBrick(BasicBrick):
             return cyl_extruded
 
     def generate(self):
-        if GLOBAL_DEBUG: 
+        if GLOBAL_DEBUG and (STUD_DEBUG or BRICK_DEBUG): 
             print(f"Generating 3d-brick:\nX: {self.x}, Y: {self.y}, Z: {self.z}")
             print(f'length: {self.length}, width: {self.width}, height: {self.height}')
             print(f"stud-x-counter: {self.stud_x_counter}, stud-y-counter: {self.stud_y_counter}")
@@ -397,7 +412,7 @@ class RectangularBrick(BasicBrick):
         for x_stud in range(int(self.stud_x_counter)):
             for y_stud in range(0, int(self.stud_y_counter)):
 
-                if GLOBAL_DEBUG:
+                if GLOBAL_DEBUG and STUD_DEBUG:
                     brick_center_x = self.x + self.length/2
                     brick_center_y = self.y + self.width/2     
                     
@@ -423,7 +438,7 @@ class RectangularBrick(BasicBrick):
 
         return compound(brickComponents)
 
-schiff = BrickProject("duplo")
+schiff = BrickProject("test")
 
 schiff.add_scene()
 
@@ -482,17 +497,20 @@ schiff.brick_scenes[0].add_brick(
 
 
 
-# Turm bauen
+#Turm bauen
 
-# for x in range(0,5):
-#     schiff.brick_scenes[0].add_brick(
-#         "rect", 4, 2, 1, 5, 0, 0, "random"
-#     )
-#     schiff.brick_scenes[0].add_brick(
-#         "rect", 4, 2, 1, 7, 0, 0, "random"
-#     )
+for x in range(0,5):
+    schiff.brick_scenes[0].add_brick(
+        "rect", 4, 2, 1, 5, 7, 0, "random"
+    )
+    schiff.brick_scenes[0].add_brick(
+        "rect", 4, 2, 1, 5, 9, 0, "random"
+    )
 
-# for x in range(0, 5):
-#     schiff.brick_scenes[0].add_brick(
-#         "rect", 4, 2, 
-#     )
+for x in range(0, 5):
+    schiff.brick_scenes[0].add_brick(
+        "rect", 4, 2, 1, 11, 4, 0, "random"
+    )
+    schiff.brick_scenes[0].add_brick(
+        "rect", 4, 2, 1, 11+x, 4, 0, "random"
+    )
