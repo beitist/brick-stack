@@ -96,6 +96,11 @@ class OccupancyGrid:
 
 
 class BrickScene:
+    """_summary_
+
+    Returns:
+        _type_: _description_
+    """
     # v0.1 / 17.11.24 / beiti
     # planned use:
     # hold individual scenes consisting of multiple bricks + optional camera / render / view setting
@@ -111,6 +116,13 @@ class BrickScene:
     # special_scene = scene details (width, height, ...) -> new obect?
     # brick_scene inherits type and project
     def __init__(self, project, special_scene=None, special_camera=None):
+        """__init__ brick_scene
+
+        Args:
+            project (obj::BrickProject): contains copy of brick-project to access standard values
+            special_scene (obj::vpython-scene, optional): individual scene settings. Defaults to None.
+            special_camera (obj::vpython-camera, optional): individual camera settings. Defaults to None.
+        """
         self.grid = OccupancyGrid()
         self.project = project
         self.brick_system = project.brick_system
@@ -223,6 +235,8 @@ class BrickFactory:
 
 
 class BasicBrick:
+    """Parent class for all bricks containing general information and a testing format
+    """
     # v0.1 / 11.11.24 / beiti
     #
     # PARAMETER:
@@ -273,6 +287,13 @@ class BasicBrick:
     brick_system = None
         
     def __init__(self, brick_system):
+        """Parent brick class __init__
+
+        is called as super from child bricks
+
+        Args:
+            brick_system (str): "lego", "duplo" or "test"; called as super from specific brick; handed over from BrickProject
+        """
         self.brick_system = brick_system
         self.specs = self.BRICK_SPECS[brick_system]
 
@@ -297,6 +318,20 @@ class RectangularBrick(BasicBrick):
     #   - separate brick-objects from brick-renders (?)
 
     def __init__(self, brick_system, length=4, width=2, height=1, x=0, y=0, z=0, brick_color=color.red):
+        """Rectangular Brick __init__
+
+        Generates a 3d-object of a rectangular brick with specified options.
+
+        Args:
+            brick_system (str): received from super; handed over from BrickProject
+            length (int, optional): Brick length (x-axis). Defaults to 4.
+            width (int, optional): Brick width (y-axis). Defaults to 2.
+            height (int, optional): Brick height (z-axis). Defaults to 1.
+            x (int, optional): X-Position of front left corner of brick. Defaults to 0.
+            y (int, optional): Y-Position of front left corner of brick. Defaults to 0.
+            z (int, optional): Z-Position of front left corner of brick. Defaults to 0.
+            brick_color (vector or vpython color, optional): vector(R, G, B) or color.name (from vpython std). Defaults to color.red.
+        """
         super().__init__(brick_system)
         self.stud_x_counter = length
         self.stud_y_counter = width
