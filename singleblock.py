@@ -19,14 +19,14 @@ class BrickProject:
     # type = duplo/lego
     # auto_z = True (no further implementation yet)
     
-    def __init__(self, type, auto_z=True):
+    def __init__(self, brick_system, auto_z=True):
         self.brick_scenes = []
-        self.type = type
+        self.brick_system = brick_system
         self.auto_z = True
 
     # special_canvas, special_camera not yet there :)
     def add_scene(self, special_canvas=None, special_camera=None):
-        brick_scene = BrickScene(self, special_canvas, special_camera, )
+        brick_scene = BrickScene(self, special_canvas, special_camera)
         self.brick_scenes.append(brick_scene)
 
     def get_scene_index(self, brick_scene):
@@ -50,7 +50,7 @@ class BrickScene:
     # brick_scene inherits type and project
     def __init__(self, project, special_scene=None, special_camera=None):
         self.project = project
-        self.type = project.type
+        self.brick_system = project.brick_system
         self.auto_z = project.auto_z
         self.bricks = []
         self.scene = self.set_scene(special_scene, special_camera)
@@ -81,25 +81,25 @@ class BrickScene:
             # return z
             # dummy function!
 
-            return 0
+            pass
 
-    def add_brick(self, brick_type, length, width, height, x_pos, y_pos, brick_color, z_pos=0):
+        return 0
+
+    def add_brick(self, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
         if self.project.auto_z:
             z_pos = self.calculate_z_pos(length, width, height, x_pos, y_pos)
         else:
             z_pos = z_pos
 
-        project_type = self.type
-
-        brick = BrickFactory(project_type,
-                             brick_type, 
-                             length, 
-                             width, 
-                             height, 
-                             x_pos, 
-                             y_pos, 
-                             z_pos, 
-                             brick_color)
+        brick = BrickFactory.create_brick(self.brick_system,
+                                          brick_type, 
+                                          length, 
+                                          width, 
+                                            height, 
+                                            x_pos, 
+                                            y_pos, 
+                                            z_pos, 
+                                            brick_color)
         
         self.bricks.append(brick)
 
@@ -112,10 +112,10 @@ class BrickFactory:
     
     # space for many types of bricks
     # needs failover if type is not implemented
-    def __init__(project_type, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
-        brick = None
+    @staticmethod
+    def create_brick(brick_system, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
         if brick_type == 'rect':
-            brick = RectangularBrick(project_type,
+            brick = RectangularBrick(brick_system,
                                      length, 
                                      width, 
                                      height, 
@@ -124,29 +124,28 @@ class BrickFactory:
                                      z_pos, 
                                      brick_color)
         else:
-            brick = RectangularBrick(project_type,
+            brick = RectangularBrick(brick_system,
                                      length, 
                                      width, 
                                      height, 
-                                     x_pos, 
+                                     x_pos,
                                      y_pos, 
                                      z_pos, 
                                      brick_color)
 
-        return brick
+        return brick    
 
 class BasicBrick:
     # v0.1 / 11.11.24 / beiti
     #
     # PARAMETER:
     # ==========
-    # type = lego/duplo
+    # brick_system = lego/duplo
     # color = VPython color code
     #
     # SPECS:
     # ======
     # generic lego/duplo for all bricks, in mm
-    # calculate z
 
     BRICK_SPECS = {
         "lego": {
@@ -172,10 +171,12 @@ class BasicBrick:
             "is_hollow": True           
         }
     }
+
+    brick_system = None
         
-    def __init__(self, type):
-        self.type = type
-        self.specs = self.BRICK_SPECS[type]
+    def __init__(self, brick_system):
+        self.brick_system = brick_system
+        self.specs = self.BRICK_SPECS[brick_system]
 
 class RectangularBrick(BasicBrick):
     # v0.2 / 3.11.24 / beiti
@@ -197,11 +198,8 @@ class RectangularBrick(BasicBrick):
     #   - Sonderformen definieren
     #   - separate brick-objects from brick-renders (?)
 
-
-
-    def __init__(self, length=4, width=2, height=1, x=0, y=0, z=0, color=color.red):
-        super().__init__(type)
-        self.type = super().type
+    def __init__(self, brick_system, length=4, width=2, height=1, x=0, y=0, z=0, brick_color=color.red):
+        super().__init__(brick_system)
         self.columns = width
         self.rows = length
 
@@ -212,7 +210,8 @@ class RectangularBrick(BasicBrick):
         self.y = y * self.specs["xy_factor"]
         self.z = z * self.specs["z_factor"]
        
-        self.color=color
+        self.color=brick_color
+
         self.generate()
 
     def generate_stud(self, pos, hollow=False, wall_thickness=0):
@@ -243,6 +242,8 @@ class RectangularBrick(BasicBrick):
             return cyl_extruded
 
     def generate(self):
+        print(f'X: {self.x}, Y: {self.y}, Z: {self.z}')
+        print(f'length: {self.length}, width: {self.width}, height: {self.height}')
         brick_basis = box(
             pos = vec(
                 self.x + self.length/2, 
@@ -253,7 +254,8 @@ class RectangularBrick(BasicBrick):
             height = self.height,
             width = self.width,
             color = self.color,
-            up = vector(0,0,1))
+            up = vector(0,0,1)
+        )
 
         brickComponents = [brick_basis]
         for i in range(int(self.rows)):
@@ -278,10 +280,10 @@ schiff = BrickProject("duplo")
 schiff.add_scene()
 
 schiff.brick_scenes[0].add_brick(
-    RectangularBrick(2, 8, 1, 0, 0, 0, color.yellow)
+    "rect", 2, 8, 1, 0, 0, 0, color.yellow
 )
 
 schiff.brick_scenes[0].add_brick(
-    RectangularBrick(2, 8, 1, 4, 0, 0, color.yellow)
+    "rect", 2, 8, 1, 4, 0, 0, color.yellow
 )
 
