@@ -8,7 +8,7 @@ import random
 # GLOBAL = Turn on/off all debug options
 GLOBAL_DEBUG = True
 
-# Turn on/off if needed
+# Turn on/off desired debug output
 CALC_DEBUG = True
 STUD_DEBUG = False
 GRID_DEBUG = False
@@ -79,10 +79,22 @@ class BrickProject:
         return self.brick_scenes.index(brick_scene)
 
 class OccupancyGrid:
+    """Helper class to store z-values for occupied grid locations
+    """
     def __init__(self):
-        self.points = {}  # Dictionary mit (x,y) als Key
+        self.points = {}  # Dictionary using (x,y) as Key
         
-    def add_brick(self, x, y, z, width, length, height):
+    def add_brick(self, x, y, z, length, width, height):
+        """Store mathematical representation of bricks for z calculation in helper grid
+
+        Args:
+            x (int): x-location of brick
+            y (int): y-location of brick
+            z (int): z-location of brick
+            width (int): width of brick in multiples of basic unit
+            length (int): see above
+            height (int): see above
+        """
         if GLOBAL_DEBUG and GRID_DEBUG: print(f"Function add_brick/OccupancyGrid: adding brick at ({x},{y}) with w={width}, l={length}")
         # Für jeden Punkt, den der Stein belegt
         for dx in range(length):
@@ -90,8 +102,10 @@ class OccupancyGrid:
                 point = (x + dx, y + dy)
                 if point not in self.points:
                     self.points[point] = []
-                # Speichere Höhenintervall (z_start, z_end)
                 self.points[point].append((z, z + height))
+
+    def get_xyz_range():
+        pass
 
     def get_min_z(self, x, y, width, length):
         max_height = 0
@@ -111,10 +125,8 @@ class OccupancyGrid:
 
 
 class BrickScene:
-    """_summary_
-
-    Returns:
-        _type_: _description_
+    """BrickScene is a functional container for individual brick scenes
+    and provides camera and scene settings
     """
     # v0.1 / 17.11.24 / beiti
     # planned use:
@@ -143,6 +155,17 @@ class BrickScene:
         self.brick_system = project.brick_system
         self.auto_z = project.auto_z
         self.bricks = []
+
+        if special_scene == None:
+            self.has_special_scene = False
+        else:
+            self.has_special_scene = True
+
+        if special_camera == None:
+            self.has_special_camera = False
+        else:
+            self.has_special_camera = True
+        
         self.scene = self.set_scene(special_scene, special_camera)
 
     def set_scene(self, special_scene=None, special_camera=None):
@@ -173,7 +196,9 @@ class BrickScene:
             # Runde auf Vielfaches von 1/3
             z = ceil(z * 3) / 3
         return z
-
+    
+    def calculate_xyz_range(self):
+        
 
     def add_brick(self, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
         if self.project.auto_z:
@@ -361,34 +386,15 @@ class RectangularBrick(BasicBrick):
 
         self.generate()
 
-    def generate_stud(self, pos, hollow=False, wall_thickness=0):
-        if not hollow:
-            return cylinder(
-                pos=pos,
-                radius=self.specs["stud_diameter"] / 2,
-                axis=vec(0.0, 0.0, self.specs["stud_height"]),
-                color=self.color
-            )
-        else:
-            cyl_base = shapes.circle(
-                radius = self.specs["stud_diameter"]/2, 
-                thickness = self.specs["stud_wall_thickness"]
-            )
-
-            cyl_path = [
-                vec(pos.x, pos.y, pos.z),
-                vec(pos.x, pos.y, pos.z + self.specs["stud_height"])
-            ]
-
-            cyl_extruded = extrusion(
-                shape = cyl_base, 
-                path = cyl_path, 
-                color = self.color
-            )
-
-            return cyl_extruded
-
     def generate(self):
+        """Generate / render brick, is called from __init__ with self (Brick-object)
+
+        Generates a box (obj::vpython) first, then calculates stud center and calls generate_stud n times (row x column)
+        to be added to the final compound
+
+        Returns:
+            compound (obj::vpython): 3d compound representing the rendered brick
+        """
         if GLOBAL_DEBUG and (STUD_DEBUG or BRICK_DEBUG): 
             print(f"Generating 3d-brick:\nX: {self.x}, Y: {self.y}, Z: {self.z}")
             print(f'length: {self.length}, width: {self.width}, height: {self.height}')
@@ -438,7 +444,46 @@ class RectangularBrick(BasicBrick):
 
         return compound(brickComponents)
 
-schiff = BrickProject("test")
+    def generate_stud(self, pos, hollow=False, wall_thickness=0):
+        """3d-function to generate and render individual studs for compound
+
+        Distinguishes between brick_systems (lego, duplo) to render 
+
+        Args:
+            pos (vector): center point of stud basis
+            hollow (bool, optional): Make hollow studs (or not). Defaults to False.
+            wall_thickness (int, optional): Stud wall thickness; see BRICK_SPECS. Defaults to 0.
+
+        Returns:
+            cylinder or extrusion (obj::vpython): returns a cylinder or an extruded circle (hollow cylinder) representing one stud
+        """
+        if not hollow:
+            generated_stud = cylinder(
+                pos=pos,
+                radius=self.specs["stud_diameter"] / 2,
+                axis=vec(0.0, 0.0, self.specs["stud_height"]),
+                color=self.color
+            )
+        else:
+            cyl_base = shapes.circle(
+                radius = self.specs["stud_diameter"]/2, 
+                thickness = self.specs["stud_wall_thickness"]
+            )
+
+            cyl_path = [
+                vec(pos.x, pos.y, pos.z),
+                vec(pos.x, pos.y, pos.z + self.specs["stud_height"])
+            ]
+
+            generated_stud = extrusion(
+                shape = cyl_base, 
+                path = cyl_path, 
+                color = self.color
+            )
+
+        return generated_stud
+
+schiff = BrickProject("duplo")
 
 schiff.add_scene()
 
@@ -497,8 +542,10 @@ schiff.brick_scenes[0].add_brick(
 
 
 
-#Turm bauen
 
+## EXAMPLES ##
+
+## Build a tower with h=5
 for x in range(0,5):
     schiff.brick_scenes[0].add_brick(
         "rect", 4, 2, 1, 5, 7, 0, "random"
@@ -507,10 +554,8 @@ for x in range(0,5):
         "rect", 4, 2, 1, 5, 9, 0, "random"
     )
 
-for x in range(0, 5):
+## Build a stairway with h=10
+for x in range(0, 10):
     schiff.brick_scenes[0].add_brick(
-        "rect", 4, 2, 1, 11, 4, 0, "random"
-    )
-    schiff.brick_scenes[0].add_brick(
-        "rect", 4, 2, 1, 11+x, 4, 0, "random"
+        "rect", 4, 2, 1, 11 + x, 4, 0, "random"
     )
