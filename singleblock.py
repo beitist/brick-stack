@@ -23,10 +23,15 @@ BRICK_DEBUG = True
 
 
 ####### TO DO ########
+## 0: close scenes? update cameras?
 ## 1: Auto_Camera, auto_scene
 ## 2: render to file
 ## 3: read simple scene files
 ## 4: create booklet
+
+
+####### NOTES #########
+## update camera better from BrickProject? ##
 
 class BrickProject:
     """Class holding individuel scenes (= steps in constructing a brick project)
@@ -114,10 +119,14 @@ class OccupancyGrid:
         max_z = 0
 
         # obtain max z
-        for point in self.points:
-            z_start, z_end = self.points[point]
-            if z_start < min_z : min_z = z_start
-            if z_end > max_z : max_z = z_end
+        for z_summary_of_coordinate in self.points:
+            if GLOBAL_DEBUG and CALC_DEBUG: print(f"value {self.points[z_summary_of_coordinate]}, key: {z_summary_of_coordinate}")
+            z_start_end = self.points[z_summary_of_coordinate]
+            
+            for z_minmax_value in self.points[z_summary_of_coordinate]:
+                z_start, z_end = z_minmax_value
+                if z_start < min_z : min_z = z_start
+                if z_end > max_z : max_z = z_end
 
         # obtain min/max x and y:
         xy_keys = self.points.keys()
@@ -128,7 +137,7 @@ class OccupancyGrid:
             if y_value < min_y : min_y = y_value
             if y_value > max_y : max_y = y_value
 
-        return {
+        results = {
             "min_x" : min_x,
             "max_x" : max_x,
             "min_y" : min_y,
@@ -136,6 +145,10 @@ class OccupancyGrid:
             "min_z" : min_z,
             "max_z" : max_z
         }
+
+        print(results)
+
+        return results
 
     def get_next_z(self, x, y, width, length):
         max_height = 0
@@ -211,8 +224,20 @@ class BrickScene:
         )
 
         # Kamera mittig von oben/vorne
-        self.scene.camera.pos = vector(3,-60,40)    # Y negativ = von vorne, Z positiv = von oben
-        self.scene.camera.axis = vector(3,60,-20)   # Schaut nach hinten und leicht nach unten
+        self.scene.camera.pos = vector(130,-30,80)    # Y negativ = von vorne, Z positiv = von oben
+        self.scene.camera.axis = vector(0,30,-30)   # Schaut nach hinten und leicht nach unten
+
+        self.scene.autoscale = True
+
+    def update_camera_position(self):
+        xyz_range = self.grid.get_xyz_range()
+        min_x = xyz_range["min_x"]
+        max_x = xyz_range["max_x"]
+        dx = max_x - min_x
+        scene_index = self.get_my_scene_index()
+        if GLOBAL_DEBUG and CALC_DEBUG: print(f"scene_index: {scene_index}")
+
+        self.project.brick_scenes[scene_index].scene.camera.pos = vector((max_x - dx/2) * self.bricks[0].specs["xy_factor"], -30, 80)
 
     def calculate_z_pos(self, length, width, height, x_pos, y_pos):
        # Finde kleinstes mögliches z
@@ -255,6 +280,8 @@ class BrickScene:
         # add math model of brick to occupancy grid (for z-calculation)
         self.grid.add_brick(x_pos, y_pos, z_pos, length, width, height)
 
+        # update camera view
+        self.update_camera_position()
 
     def get_my_scene_index(self):
         return self.project.get_scene_index(self)
@@ -542,15 +569,15 @@ for x in range(0, 10):
         "rect", 4, 2, 1, 11 + x, 4, 0, "random"
     )
 
-new_scene = canvas(
-    width=1000,            # window width
-    height=800,           # window height
-    center=vector(0,0,0), # Scene center
-    background=color.cyan,  # bg color
-    up=vector(0,0,1)     # Z is "up"
-)
+# new_scene = canvas(
+#     width=1000,            # window width
+#     height=800,           # window height
+#     center=vector(0,0,0), # Scene center
+#     background=color.cyan,  # bg color
+#     up=vector(0,0,1)     # Z is "up"
+# )
 
-new_scene.camera.pos = vector(30,-60,40)    # Y negativ = von vorne, Z positiv = von oben
-new_scene.camera.axis = vector(0,60,-20) 
+# new_scene.camera.pos = vector(30,-60,40)    # Y negativ = von vorne, Z positiv = von oben
+# new_scene.camera.axis = vector(0,60,-20) 
 
-new_scene.select()
+# new_scene.select()
