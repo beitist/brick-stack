@@ -28,6 +28,7 @@ BRICK_DEBUG = True
 ## 2: render to file
 ## 3: read simple scene files
 ## 4: create booklet
+## 5: encapsulation ok? CameraManager?
 
 
 ####### NOTES #########
