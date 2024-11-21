@@ -47,12 +47,15 @@ class BrickProject:
     # type = duplo/lego
     # auto_z = True // turn off by initialising project with auto_z = False
     
-    def __init__(self, brick_system, auto_z=True):
+    def __init__(self, brick_system, baseplate = True, auto_z = True, baseplate_color = None, baseplate_custom_x = None, baseplate_custom_y = None):
         """BrickProject init
         
         Args:
             brick_system (str): "duplo", "lego" or "test"
+            baseplate (bool): True (standard), creates a baseplate with rounded corners and studs
             auto_z (bool): True (standard), change to define own z-values
+            baseplate_color: optional, define a vector if you want anything else but green
+            baseplate_custom_x / _y: optional, define size if you want another size than standard (24x24 duplo, 48x48 lego)
 
         Additional Variables:
             brick_scenes (array): empty array to store brick_scenes (int-index)
@@ -60,7 +63,11 @@ class BrickProject:
 
         self.brick_scenes = []
         self.brick_system = brick_system
-        self.auto_z = True
+        self.auto_z = auto_z
+        self.baseplate = baseplate
+        self.baseplate_color = baseplate_color
+        self.baseplate_custom_x = baseplate_custom_x
+        self.baseplate_custom_y = baseplate_custom_y
 
     # special_canvas, special_camera not yet there :)
     def add_scene(self, special_canvas=None, special_camera=None):
@@ -121,7 +128,7 @@ class OccupancyGrid:
         # obtain max z
         for z_summary_of_coordinate in self.points:
             if GLOBAL_DEBUG and CALC_DEBUG: print(f"value {self.points[z_summary_of_coordinate]}, key: {z_summary_of_coordinate}")
-            z_start_end = self.points[z_summary_of_coordinate]
+            # z_start_end = self.points[z_summary_of_coordinate]
             
             for z_minmax_value in self.points[z_summary_of_coordinate]:
                 z_start, z_end = z_minmax_value
@@ -331,13 +338,31 @@ class BrickFactory:
 
     @staticmethod
     def choose_random_color():
+        """Randomize brick color
+
+        Returns:
+            vector: RGB-vector for use with vpython
+        """
         random.seed()
-        red = random.randint(0, 100) / 100
-        green = random.randint(0, 100) / 100
-        blue = random.randint(0, 100) / 100
+        red = random.randint(0, 10) / 10
+        green = random.randint(0, 10) / 10
+        blue = random.randint(0, 10) / 10
 
         return vector(red, green, blue)
 
+    @staticmethod
+    def create_baseplate(project, scene = 0, custom_x = None, custom_y = None):
+        specs = BasicBrick.BRICK_SPECS[project.brick_system]
+        length = specs["xy_factor"] * custom_x or (24 if project.brick_system == "duplo" else 48)
+        width = specs["xy_factor"] * custom_y or (24 if project.brick_system == "duplo" else 48)
+
+        # steps: 
+        # 1. create rectangle (rt = shapes.rectangle(width, height, roundness=0.1?))
+        # 2. extrusion_line_path = [ vec(0,0,0), vec(0,0,-0.1)]
+        # 3. rect = extrusion( shape = rt, path = extrusion_line_path)
+        # 4. put into compound
+        # 5. call generate stud for all rows (except corners for duplo)
+        # 6. add compound to scene
 
 class BasicBrick:
     """Parent class for all bricks containing general information and a testing format
@@ -577,15 +602,4 @@ for x in range(0, 10):
         "rect", 4, 2, 1, 11 + x, 4, 0, "random"
     )
 
-# new_scene = canvas(
-#     width=1000,            # window width
-#     height=800,           # window height
-#     center=vector(0,0,0), # Scene center
-#     background=color.cyan,  # bg color
-#     up=vector(0,0,1)     # Z is "up"
-# )
-
-# new_scene.camera.pos = vector(30,-60,40)    # Y negativ = von vorne, Z positiv = von oben
-# new_scene.camera.axis = vector(0,60,-20) 
-
-# new_scene.select()
+# end
