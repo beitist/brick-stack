@@ -227,9 +227,16 @@ class BrickScene:
         self.scene.camera.pos = vector(130,-30,80)    # Y negativ = von vorne, Z positiv = von oben
         self.scene.camera.axis = vector(0,30,-30)   # Schaut nach hinten und leicht nach unten
 
-        self.scene.autoscale = True
+        # self.scene.autoscale = True
 
     def update_camera_position(self):
+        """Update camera position after new block is placed
+
+        Args:
+            none
+
+        Currently only calculates x-extension and moves the camera so it points to x-center of scene.
+        """    
         xyz_range = self.grid.get_xyz_range()
         min_x = xyz_range["min_x"]
         max_x = xyz_range["max_x"]
@@ -237,7 +244,8 @@ class BrickScene:
         scene_index = self.get_my_scene_index()
         if GLOBAL_DEBUG and CALC_DEBUG: print(f"scene_index: {scene_index}")
 
-        self.project.brick_scenes[scene_index].scene.camera.pos = vector((max_x - dx/2) * self.bricks[0].specs["xy_factor"], -30, 80)
+        current_canvas = canvas.get_selected()
+        current_canvas.camera.pos = vector((max_x - dx/2) * self.bricks[0].specs["xy_factor"], -30, 80)
 
     def calculate_z_pos(self, length, width, height, x_pos, y_pos):
        # Finde kleinstes mögliches z
