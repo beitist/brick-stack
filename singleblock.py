@@ -632,7 +632,7 @@ class RectangularBrick(BasicBrick):
 
         return generated_stud
 
-schiff = BrickProject("duplo")
+schiff = BrickProject("lego")
 
 schiff.add_scene()
 
@@ -663,4 +663,4 @@ for x in range(0, 10):
         "rect", 4, 2, 1, 11 + x, 4, 0, "random"
     )
 
-# end
+## 
