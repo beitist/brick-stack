@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# lego and duplo are trademarks of their respective owners!
+
 from vpython import *
 import random
 
@@ -12,7 +14,7 @@ GLOBAL_DEBUG = True
 CALC_DEBUG = True
 STUD_DEBUG = False
 GRID_DEBUG = False
-BRICK_DEBUG = True
+BRICK_DEBUG = False
 
 ##### COORDINATES #####
 ## x = length from left to right (standard camera view)
@@ -48,15 +50,12 @@ class BrickProject:
     # type = duplo/lego
     # auto_z = True // turn off by initialising project with auto_z = False
     
-    def __init__(self, brick_system, baseplate = True, auto_z = True, baseplate_color = None, baseplate_custom_x = None, baseplate_custom_y = None):
+    def __init__(self, brick_system, auto_z = True):
         """BrickProject init
         
         Args:
             brick_system (str): "duplo", "lego" or "test"
-            baseplate (bool): True (standard), creates a baseplate with rounded corners and studs
             auto_z (bool): True (standard), change to define own z-values
-            baseplate_color: optional, define a vector if you want anything else but green
-            baseplate_custom_x / _y: optional, define size if you want another size than standard (24x24 duplo, 48x48 lego)
 
         Additional Variables:
             brick_scenes (array): empty array to store brick_scenes (int-index)
@@ -64,11 +63,7 @@ class BrickProject:
 
         self.brick_scenes = []
         self.brick_system = brick_system
-        self.auto_z = auto_z
-        self.baseplate = baseplate
-        self.baseplate_color = baseplate_color
-        self.baseplate_custom_x = baseplate_custom_x
-        self.baseplate_custom_y = baseplate_custom_y
+        self.auto_z = auto_z        
 
     # special_canvas, special_camera not yet there :)
     def add_scene(self, special_canvas=None, special_camera=None):
@@ -78,6 +73,10 @@ class BrickProject:
         so that you can reconstruct the visual design with your bricks and then switch to the
         next scene showing the next steps. Scenes can maintain an automatic
         camera and canvas object, or you can specify your own.
+
+        Add baseplates to scenes like bricks with different arguments. Baseplates
+        are centered at (1, 1) by default and are 24x24 (duplo) or 48x48 (lego). Baseplates
+        are not considered when placing bricks with auto-z.
         
         Args:
             special_canvas (obj): vpython-canvas object, optional
@@ -219,21 +218,40 @@ class BrickScene:
         
         self.scene = self.set_scene(special_scene, special_camera)
 
+    def add_baseplate(self, baseplate_color = color.green, baseplate_custom_length = None, baseplate_custom_width = None, baseplate_custom_x = None, baseplate_custom_y = None):
+        """Add a baseplate to a scene
+
+        Careful: The position of the baseplate is given by the center, not as with bricks by the lower left corner.
+
+        Args:
+            baseplate_color (vector (rgb) or color.x, optional): Specify a different color for the baseplate. Defaults to color.green.
+            baseplate_custom_length (int, optional): Individual length of baseplate; internal defaults = 24 / 48 (lego/duplo). Defaults to None.
+            baseplate_custom_width (int, optional): See length. Defaults to None.
+            baseplate_custom_x (int, optional): Custom center position of baseplate; internal default = 0. Defaults to None.
+            baseplate_custom_y (_type_, optional): See custom_y. Defaults to None.
+        """
+        baseplate = BrickFactory.create_baseplate(self.brick_system, baseplate_color, baseplate_custom_length, baseplate_custom_width, baseplate_custom_x, baseplate_custom_y)
+        self.bricks.append(baseplate)
+
     def set_scene(self, special_scene=None, special_camera=None):
         # Scene with std values
         # special scene/camera not yet implemented
 
         self.scene = canvas(
-            width=800,            # window width
-            height=600,           # window height
+            width=1024,            # window width
+            height=768,           # window height
             center=vector(0,0,0), # Scene center
             background=color.cyan,  # bg color
             up=vector(0,0,1)     # Z is "up"
         )
 
         # Kamera mittig von oben/vorne
-        self.scene.camera.pos = vector(130,-30,80)    # Y negativ = von vorne, Z positiv = von oben
-        self.scene.camera.axis = vector(0,30,-30)   # Schaut nach hinten und leicht nach unten
+        if self.brick_system == "lego":
+            self.scene.camera.pos = vector(130,-30,80)    # Y negativ = von vorne, Z positiv = von oben
+            self.scene.camera.axis = vector(0,30,-30)   # Schaut nach hinten und leicht nach unten
+        else:
+            self.scene.camera.pos = vector(260,-60,160)    # Y negativ = von vorne, Z positiv = von oben
+            self.scene.camera.axis = vector(0,60,-60)   # Schaut nach hinten und leicht nach unten            
 
         # self.scene.autoscale = True
 
@@ -253,7 +271,7 @@ class BrickScene:
         if GLOBAL_DEBUG and CALC_DEBUG: print(f"scene_index: {scene_index}")
 
         current_canvas = canvas.get_selected()
-        current_canvas.camera.pos = vector((max_x - dx/2) * self.bricks[0].specs["xy_factor"], -30, 80)
+        current_canvas.camera.pos = vector((max_x - dx/2) * self.bricks[-1].specs["xy_factor"], -30, 80)
 
     def calculate_z_pos(self, length, width, height, x_pos, y_pos):
        # Finde kleinstes mögliches z
@@ -272,6 +290,7 @@ class BrickScene:
         xyz_range = self.grid.get_xyz_range(self)       
 
     def add_brick(self, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
+        # auto-z or not
         if self.project.auto_z:
             z_pos = self.calculate_z_pos(length, width, height, x_pos, y_pos)
         else:
@@ -310,7 +329,6 @@ class BrickFactory:
     # needs failover if type is not implemented
     @staticmethod
     def create_brick(brick_system, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
-
         if brick_color == "random":
             final_brick_color = BrickFactory.choose_random_color()
         else:
@@ -352,10 +370,50 @@ class BrickFactory:
         return vector(red, green, blue)
 
     @staticmethod
-    def create_baseplate(project, scene = 0, custom_x = None, custom_y = None):
-        specs = BasicBrick.BRICK_SPECS[project.brick_system]
-        length = specs["xy_factor"] * custom_x or (24 if project.brick_system == "duplo" else 48)
-        width = specs["xy_factor"] * custom_y or (24 if project.brick_system == "duplo" else 48)
+    def create_baseplate(brick_system, baseplate_color, baseplate_custom_length, baseplate_custom_width, baseplate_custom_x, baseplate_custom_y):
+        # custom_x/y: center (standard: 0,0)
+        specs = BasicBrick.BRICK_SPECS[brick_system]
+        length = (
+            specs["xy_factor"] * baseplate_custom_length
+            if baseplate_custom_length is not None
+            else (specs["xy_factor"] * (24 if brick_system == "duplo" else 48))
+        )
+        width = (
+            specs["xy_factor"] * baseplate_custom_width 
+            if baseplate_custom_width is not None
+            else (specs["xy_factor"] * (24 if brick_system == "duplo" else 48))
+        )
+        custom_x = (
+            specs["xy_factor"] * baseplate_custom_x
+            if baseplate_custom_x is not None
+            else (specs["xy_factor"] * 0)
+        )
+        custom_y = (
+            specs["xy_factor"] * baseplate_custom_y
+            if baseplate_custom_y is not None
+            else (specs["xy_factor"] * 0)
+        )
+
+        if GLOBAL_DEBUG and CALC_DEBUG: print(f"Baseplate values: x: {custom_x}, y: {custom_y}, width: {width}, length: {length}")
+
+        baseplate_linepath_z = [vec(0,0,0), 
+                                vec(0, 0, -0.15 * specs["xy_factor"])
+        ]
+
+        baseplate_shape = shapes.rectangle(
+            pos=[custom_x, custom_y],
+            width = width,
+            height = length,
+        )
+
+        baseplate_extrusion = extrusion(
+            shape = baseplate_shape,
+            path = baseplate_linepath_z,
+            color = baseplate_color
+        )
+
+        return baseplate_extrusion
+
 
         # steps: 
         # 1. create rectangle (rt = shapes.rectangle(width, height, roundness=0.1?))
@@ -577,6 +635,8 @@ class RectangularBrick(BasicBrick):
 schiff = BrickProject("duplo")
 
 schiff.add_scene()
+
+schiff.brick_scenes[0].add_baseplate()
 
 schiff.brick_scenes[0].add_brick(
     "rect", 4, 2, 1, 0, 0, 0, color.cyan
