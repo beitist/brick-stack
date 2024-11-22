@@ -632,35 +632,62 @@ class RectangularBrick(BasicBrick):
 
         return generated_stud
 
-schiff = BrickProject("lego")
+my_project = BrickProject("lego")
 
-schiff.add_scene()
+my_project.add_scene()
 
-schiff.brick_scenes[0].add_baseplate()
+my_project.brick_scenes[0].add_baseplate()
 
-schiff.brick_scenes[0].add_brick(
-    "rect", 4, 2, 1, 0, 0, 0, color.cyan
-)
+def build_house(scene, x, y):
+    # Foundation
+    for dx in range(6):
+        for dy in range(6):
+            scene.add_brick("rect", 1, 1, 1, x+dx, y+dy, 0, vector(0.5,0.5,0.5))
+    
+    # Walls
+    for z in range(4):  # Height of walls
+        for dx in [0, 5]:  # Side walls
+            for dy in range(6):
+                scene.add_brick("rect", 1, 1, 1, x+dx, y+dy, z+1, color.red)
+        for dy in [0, 5]:  # Front/back walls
+            for dx in range(6):
+                # Skip door space
+                if z < 2 and dy == 0 and dx in [2, 3]:
+                    continue
+                scene.add_brick("rect", 1, 1, 1, x+dx, y+dy, z+1, color.red)
 
-schiff.brick_scenes[0].add_brick(
-    "rect", 4, 2, 1, 4, 0, 0, "random"
-)
+    # Roof
+    for dx in range(7):
+        height = abs(3 - dx)  
+        scene.add_brick("rect", 6, 1, 1, x, y+dx, 5+height, color.blue)
 
-## EXAMPLES ##
+build_house(my_project.brick_scenes[0], 0, 0)
 
-## Build a tower with h=5
-for x in range(0,5):
-    schiff.brick_scenes[0].add_brick(
-        "rect", 4, 2, 1, 5, 7, 0, "random"
-    )
-    schiff.brick_scenes[0].add_brick(
-        "rect", 4, 2, 1, 5, 9, 0, "random"
-    )
+# my_project.brick_scenes[0].add_brick(
+#     "rect", 4, 2, 1, 0, 0, 0, color.cyan
+# )
 
-## Build a stairway with h=10
-for x in range(0, 10):
-    schiff.brick_scenes[0].add_brick(
-        "rect", 4, 2, 1, 11 + x, 4, 0, "random"
-    )
+# my_project.brick_scenes[0].add_brick(
+#     "rect", 4, 2, 1, 4, 0, 0, "random"
+# )
 
-## 
+# ## EXAMPLES ##
+
+# ## Build a tower with h=5
+# for x in range(5):
+#     my_project.brick_scenes[0].add_brick(
+#         "rect", 4, 2, 1, 5, 7, 0, "random"
+#     )
+#     my_project.brick_scenes[0].add_brick(
+#         "rect", 4, 2, 1, 5, 9, 0, "random"
+#     )
+
+# ## Build a stairway with h=10
+# for x in range(10):
+#     my_project.brick_scenes[0].add_brick(
+#         "rect", 4, 2, 1, 11 + x, 4, 0, "random"
+#     )
+
+# ## Debug this code! It should be a staircase.
+# for i in range(5):
+#     my_project.brick_scenes[0].add_brick("rect", 2, 1, 1, i, i, i-1, color.blue)
