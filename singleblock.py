@@ -11,8 +11,8 @@ import random
 GLOBAL_DEBUG = True
 
 # Turn on/off desired debug output
-CALC_DEBUG = True
-STUD_DEBUG = False
+CALC_DEBUG = False
+STUD_DEBUG = True
 GRID_DEBUG = False
 BRICK_DEBUG = False
 
@@ -31,13 +31,14 @@ BRICK_DEBUG = False
 ## 3: read simple scene files
 ## 4: create booklet
 ## 5: encapsulation ok? CameraManager?
-
+## 6: make baseplate a subclass to rectangularbrick??
+## 7: try clone for stud generation (duplo!)
 
 ####### NOTES #########
 ## update camera better from BrickProject? ##
 
 class BrickProject:
-    """Class holding individuel scenes (= steps in constructing a brick project)
+    """Class holding individual scenes (= steps in constructing a brick project)
     
     Will (soon) provide functionality for file handling of simplified project files"""
     # v0.1c / 17.11.24 / beiti
@@ -218,7 +219,7 @@ class BrickScene:
         
         self.scene = self.set_scene(special_scene, special_camera)
 
-    def add_baseplate(self, baseplate_color = color.green, baseplate_custom_length = None, baseplate_custom_width = None, baseplate_custom_x = None, baseplate_custom_y = None):
+    def add_baseplate(self, baseplate_color = color.green * 0.5, baseplate_custom_length = None, baseplate_custom_width = None, baseplate_custom_x = None, baseplate_custom_y = None):
         """Add a baseplate to a scene
 
         Careful: The position of the baseplate is given by the center, not as with bricks by the lower left corner.
@@ -356,6 +357,17 @@ class BrickFactory:
         return brick  
 
     @staticmethod
+    def create_baseplate(brick_system, baseplate_color, baseplate_custom_length, baseplate_custom_width, baseplate_center_x, baseplate_center_y):
+        # custom_x/y: center (standard: 0,0)
+        # specs = BasicBrick.BRICK_SPECS[brick_system]
+
+        if GLOBAL_DEBUG and CALC_DEBUG: print(f"Baseplate values: x: {baseplate_center_x}, y: {baseplate_center_y}, width: {baseplate_custom_width}, length: {baseplate_custom_length}")
+
+        baseplate = Baseplate(brick_system, baseplate_color, baseplate_custom_length, baseplate_custom_width, baseplate_center_x, baseplate_center_y)
+
+        return baseplate
+
+    @staticmethod
     def choose_random_color():
         """Randomize brick color
 
@@ -369,59 +381,6 @@ class BrickFactory:
 
         return vector(red, green, blue)
 
-    @staticmethod
-    def create_baseplate(brick_system, baseplate_color, baseplate_custom_length, baseplate_custom_width, baseplate_custom_x, baseplate_custom_y):
-        # custom_x/y: center (standard: 0,0)
-        specs = BasicBrick.BRICK_SPECS[brick_system]
-        length = (
-            specs["xy_factor"] * baseplate_custom_length
-            if baseplate_custom_length is not None
-            else (specs["xy_factor"] * (24 if brick_system == "duplo" else 48))
-        )
-        width = (
-            specs["xy_factor"] * baseplate_custom_width 
-            if baseplate_custom_width is not None
-            else (specs["xy_factor"] * (24 if brick_system == "duplo" else 48))
-        )
-        custom_x = (
-            specs["xy_factor"] * baseplate_custom_x
-            if baseplate_custom_x is not None
-            else (specs["xy_factor"] * 0)
-        )
-        custom_y = (
-            specs["xy_factor"] * baseplate_custom_y
-            if baseplate_custom_y is not None
-            else (specs["xy_factor"] * 0)
-        )
-
-        if GLOBAL_DEBUG and CALC_DEBUG: print(f"Baseplate values: x: {custom_x}, y: {custom_y}, width: {width}, length: {length}")
-
-        baseplate_linepath_z = [vec(0,0,0), 
-                                vec(0, 0, -0.15 * specs["xy_factor"])
-        ]
-
-        baseplate_shape = shapes.rectangle(
-            pos=[custom_x, custom_y],
-            width = width,
-            height = length,
-        )
-
-        baseplate_extrusion = extrusion(
-            shape = baseplate_shape,
-            path = baseplate_linepath_z,
-            color = baseplate_color
-        )
-
-        return baseplate_extrusion
-
-
-        # steps: 
-        # 1. create rectangle (rt = shapes.rectangle(width, height, roundness=0.1?))
-        # 2. extrusion_line_path = [ vec(0,0,0), vec(0,0,-0.1)]
-        # 3. rect = extrusion( shape = rt, path = extrusion_line_path)
-        # 4. put into compound
-        # 5. call generate stud for all rows (except corners for duplo)
-        # 6. add compound to scene
 
 class BasicBrick:
     """Parent class for all bricks containing general information and a testing format
@@ -446,7 +405,8 @@ class BasicBrick:
             "stud_xy_offset": 3.9,
             "stud_spacing": 7.8,
             "stud_wall_thickness": 0,
-            "is_hollow": False
+            "is_hollow": False,
+            "baseplate_height" : 0.15
         },
 
         # due to likely render issues, stud diameter is reduced by half of wall thickness
@@ -458,7 +418,8 @@ class BasicBrick:
             "stud_xy_offset": 7.8,
             "stud_spacing": 15.6,
             "stud_wall_thickness": 2.2,
-            "is_hollow": True           
+            "is_hollow": True,
+            "baseplate_height" : 0.15           
         },
 
         "test": {
@@ -473,7 +434,7 @@ class BasicBrick:
         }
     }
 
-    brick_system = None
+    #brick_system = None
         
     def __init__(self, brick_system):
         """Parent brick class __init__
@@ -485,6 +446,138 @@ class BasicBrick:
         """
         self.brick_system = brick_system
         self.specs = self.BRICK_SPECS[brick_system]
+
+    def generate_stud(self, pos, hollow=False, wall_thickness = None):
+        """3d-function to generate and render individual studs for compound
+
+        Distinguishes between brick_systems (lego, duplo) to render 
+
+        Args:
+            pos (vector): center point of stud basis
+            hollow (bool, optional): Make hollow studs (or not). Defaults to False.
+            wall_thickness (int, optional): Stud wall thickness; see BRICK_SPECS. Defaults to None.
+
+        Returns:
+            cylinder or extrusion (obj::vpython): returns a cylinder or an extruded circle (hollow cylinder) representing one stud
+        """
+        if GLOBAL_DEBUG and STUD_DEBUG: print(f"Generating 3d-stud at {pos}.")
+        if not hollow:
+            generated_stud = cylinder(
+                pos=pos,
+                radius=self.specs["stud_diameter"] / 2,
+                axis=vec(0.0, 0.0, self.specs["stud_height"]),
+                color=self.brick_color
+            )
+        else:
+            cyl_base = shapes.circle(
+                radius = self.specs["stud_diameter"]/2, 
+                thickness = self.specs["stud_wall_thickness"]
+            )
+
+            cyl_path = [
+                vec(pos.x, pos.y, pos.z),
+                vec(pos.x, pos.y, pos.z + self.specs["stud_height"])
+            ]
+
+            generated_stud = extrusion(
+                shape = cyl_base, 
+                path = cyl_path, 
+                color = self.brick_color
+            )
+ 
+        return generated_stud
+
+class Baseplate(BasicBrick):
+    def __init__(self, brick_system, baseplate_color, baseplate_length : int = None, baseplate_width : int = None, baseplate_center_x : int = None, baseplate_center_y : int = None):
+        super().__init__(brick_system)
+        self.stud_x_counter = (
+            baseplate_length if baseplate_length is not None
+            else (24 if brick_system == "duplo" else 48)
+        )
+        self.stud_y_counter = (
+            baseplate_width if baseplate_width is not None
+            else (24 if brick_system == "duplo" else 48)
+        )
+        # this is not ideal - how to organise brick/baseplate classes?
+        self.brick_color = baseplate_color
+        # Factorise size based on brick system
+        self.baseplate_length = (
+            self.specs["xy_factor"] * baseplate_length
+            if baseplate_length is not None
+            else (self.specs["xy_factor"] * (24 if brick_system == "duplo" else 48))
+        )
+        self.baseplate_width = (
+            self.specs["xy_factor"] * baseplate_width 
+            if baseplate_width is not None
+            else (self.specs["xy_factor"] * (24 if brick_system == "duplo" else 48))
+        )
+        self.baseplate_center_x = (
+            self.specs["xy_factor"] * baseplate_center_x
+            if baseplate_center_x is not None
+            else (self.specs["xy_factor"] * 0)
+        )
+        self.baseplate_center_y = (
+            self.specs["xy_factor"] * baseplate_center_y
+            if baseplate_center_y is not None
+            else (self.specs["xy_factor"] * 0)
+        )
+        self.height = self.specs["baseplate_height"] * self.specs["xy_factor"]
+        self.lower_left_x = self.baseplate_center_x - self.baseplate_length * 0.5
+        self.lower_left_y = self.baseplate_center_y - self.baseplate_width * 0.5
+        # Keep to make baseplate a child of rectangularbrick later
+        self.lower_left_z = 0
+
+        self.generate()
+
+    def generate(self):
+        baseplate_linepath_z = [vec(0,0,0), 
+                                vec(0, 0, -0.15 * self.specs["xy_factor"])
+        ]
+        baseplate_shape = shapes.rectangle(
+            pos=[self.baseplate_center_x, self.baseplate_center_y],
+            width = self.baseplate_width,
+            height = self.baseplate_length
+        )
+        baseplate_extrusion = extrusion(
+            shape = baseplate_shape,
+            path = baseplate_linepath_z,
+            color = self.brick_color
+        )
+
+        baseplate_compound = [baseplate_extrusion]
+
+        if GLOBAL_DEBUG and STUD_DEBUG: print(f"Before x/y for: stud_x_counter: {self.stud_x_counter}, stud_y_counter: {self.stud_y_counter}")
+
+        # duplo: corner-studs do not exist!
+        for x_stud in (range(int(self.stud_x_counter))):
+            for y_stud in (range(int(self.stud_y_counter))):
+
+                if GLOBAL_DEBUG and STUD_DEBUG:
+                    brick_center_x = self.baseplate_center_x
+                    brick_center_y = self.baseplate_center_y    
+                    
+                    stud_x = self.lower_left_x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"])
+                    stud_y = self.lower_left_y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"])
+                    
+                    print("Checking stud position in generate-call (3d) / BASEPLATE!")
+                    print(f"Brick center: ({brick_center_x}, {brick_center_y})")
+                    print(f"Stud position: ({stud_x}, {stud_y})")
+
+                stud_center = vec(
+                    self.lower_left_x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"]),
+                    self.lower_left_y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"]),
+                    self.lower_left_z + self.height)
+
+                stud = self.generate_stud(
+                    pos = stud_center,
+                    hollow = self.specs["is_hollow"],
+                    wall_thickness = self.specs["stud_wall_thickness"]
+                )
+
+                baseplate_compound.append(stud)
+
+        return compound(baseplate_compound)
+
 
 class RectangularBrick(BasicBrick):
     # v0.2a / 17.11.24 / beiti
@@ -530,8 +623,7 @@ class RectangularBrick(BasicBrick):
         self.x = x * self.specs["xy_factor"]
         self.y = y * self.specs["xy_factor"]
         self.z = z * self.specs["z_factor"]
-
-        self.color=brick_color
+        self.brick_color=brick_color
 
         self.generate()
 
@@ -559,11 +651,11 @@ class RectangularBrick(BasicBrick):
             length = self.length,
             height = self.height,
             width = self.width,
-            color = self.color,
+            color = self.brick_color,
             up = vector(0,0,1)
         )
 
-        brickComponents = [brick_basis]
+        brick_components = [brick_basis]
         for x_stud in range(int(self.stud_x_counter)):
             for y_stud in range(0, int(self.stud_y_counter)):
 
@@ -589,105 +681,43 @@ class RectangularBrick(BasicBrick):
                     wall_thickness = self.specs["stud_wall_thickness"]
                 )
 
-                brickComponents.append(stud)
+                brick_components.append(stud)
 
-        return compound(brickComponents)
+        return compound(brick_components)
 
-    def generate_stud(self, pos, hollow=False, wall_thickness=0):
-        """3d-function to generate and render individual studs for compound
+def create_simple_house():
+    # Initialisiere ein Projekt (z.B. "lego" für klassische Legosteine)
+    project = BrickProject(brick_system="lego", auto_z=True)
 
-        Distinguishes between brick_systems (lego, duplo) to render 
+    # Szene hinzufügen
+    project.add_scene()
 
-        Args:
-            pos (vector): center point of stud basis
-            hollow (bool, optional): Make hollow studs (or not). Defaults to False.
-            wall_thickness (int, optional): Stud wall thickness; see BRICK_SPECS. Defaults to 0.
+    # Aktuelle Szene holen
+    scene = project.brick_scenes[-1]
 
-        Returns:
-            cylinder or extrusion (obj::vpython): returns a cylinder or an extruded circle (hollow cylinder) representing one stud
-        """
-        if not hollow:
-            generated_stud = cylinder(
-                pos=pos,
-                radius=self.specs["stud_diameter"] / 2,
-                axis=vec(0.0, 0.0, self.specs["stud_height"]),
-                color=self.color
-            )
-        else:
-            cyl_base = shapes.circle(
-                radius = self.specs["stud_diameter"]/2, 
-                thickness = self.specs["stud_wall_thickness"]
-            )
+    # Basisplatte hinzufügen
+    scene.add_baseplate(baseplate_color=color.green, baseplate_custom_length=16, baseplate_custom_width=16)
 
-            cyl_path = [
-                vec(pos.x, pos.y, pos.z),
-                vec(pos.x, pos.y, pos.z + self.specs["stud_height"])
-            ]
+    # Grundstruktur des Hauses (Wände)
+    # Vorderwand
+    for x in range(0, 8, 2):
+        scene.add_brick(brick_type='rect', length=2, width=1, height=1, x_pos=x, y_pos=0, z_pos=0, brick_color=color.red)
 
-            generated_stud = extrusion(
-                shape = cyl_base, 
-                path = cyl_path, 
-                color = self.color
-            )
+    # Rückwand
+    for x in range(0, 8, 2):
+        scene.add_brick(brick_type='rect', length=2, width=1, height=1, x_pos=x, y_pos=6, z_pos=0, brick_color=color.red)
 
-        return generated_stud
+    # Seitenwände
+    for y in range(0, 7, 2):
+        scene.add_brick(brick_type='rect', length=1, width=2, height=1, x_pos=0, y_pos=y, z_pos=0, brick_color=color.blue)
+        scene.add_brick(brick_type='rect', length=1, width=2, height=1, x_pos=7, y_pos=y, z_pos=0, brick_color=color.blue)
 
-my_project = BrickProject("lego")
+    # Dach (eine schräge Ebene aus 1x2 Steinen)
+    for x in range(0, 8, 2):
+        scene.add_brick(brick_type='rect', length=2, width=2, height=1, x_pos=x, y_pos=2, z_pos=3, brick_color=color.yellow)
 
-my_project.add_scene()
+    # Projekt ist nun bereit. Du kannst es erweitern oder rendern.
+    print("Einfaches Haus wurde erfolgreich erstellt.")
 
-my_project.brick_scenes[0].add_baseplate()
-
-def build_house(scene, x, y):
-    # Foundation
-    for dx in range(6):
-        for dy in range(6):
-            scene.add_brick("rect", 1, 1, 1, x+dx, y+dy, 0, vector(0.5,0.5,0.5))
-    
-    # Walls
-    for z in range(4):  # Height of walls
-        for dx in [0, 5]:  # Side walls
-            for dy in range(6):
-                scene.add_brick("rect", 1, 1, 1, x+dx, y+dy, z+1, color.red)
-        for dy in [0, 5]:  # Front/back walls
-            for dx in range(6):
-                # Skip door space
-                if z < 2 and dy == 0 and dx in [2, 3]:
-                    continue
-                scene.add_brick("rect", 1, 1, 1, x+dx, y+dy, z+1, color.red)
-
-    # Roof
-    for dx in range(7):
-        height = abs(3 - dx)  
-        scene.add_brick("rect", 6, 1, 1, x, y+dx, 5+height, color.blue)
-
-build_house(my_project.brick_scenes[0], 0, 0)
-
-# my_project.brick_scenes[0].add_brick(
-#     "rect", 4, 2, 1, 0, 0, 0, color.cyan
-# )
-
-# my_project.brick_scenes[0].add_brick(
-#     "rect", 4, 2, 1, 4, 0, 0, "random"
-# )
-
-# ## EXAMPLES ##
-
-# ## Build a tower with h=5
-# for x in range(5):
-#     my_project.brick_scenes[0].add_brick(
-#         "rect", 4, 2, 1, 5, 7, 0, "random"
-#     )
-#     my_project.brick_scenes[0].add_brick(
-#         "rect", 4, 2, 1, 5, 9, 0, "random"
-#     )
-
-# ## Build a stairway with h=10
-# for x in range(10):
-#     my_project.brick_scenes[0].add_brick(
-#         "rect", 4, 2, 1, 11 + x, 4, 0, "random"
-#     )
-
-# ## Debug this code! It should be a staircase.
-# for i in range(5):
-#     my_project.brick_scenes[0].add_brick("rect", 2, 1, 1, i, i, i-1, color.blue)
+# Aufrufen der Funktion
+create_simple_house()

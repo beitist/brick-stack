@@ -6,9 +6,11 @@ brick-stack is intended to serve as a learning tool as well as a toy for modelli
 ## To Do
 - [x] auto-z
 - [x] automatic camera (x)
+- [ ] automatic camera including baseplate (x)
 - [ ] automatic camera (y, z)
 - [x] add baseplate
-- [ ] add baseplate studs
+- [x] add baseplate studs
+- [ ] improve stud speed
 - [ ] verify the documented examples
 - [ ] add examples for auto-z = False
 - [ ] create CameraManager
@@ -234,7 +236,7 @@ def build_house(scene, x, y):
     # Foundation
     for dx in range(6):
         for dy in range(6):
-            scene.add_brick("rect", 1, 1, 1, x+dx, y+dy, 0, color.gray)
+            scene.add_brick("rect", 1, 1, 1, x+dx, y+dy, 0, color.black * 0.3)
     
     # Walls
     for z in range(4):  # Height of walls
@@ -251,7 +253,7 @@ def build_house(scene, x, y):
     # Roof
     for dx in range(7):
         height = abs(3 - dx)  # Create slope
-        scene.add_brick("rect", 1, 6, 1, x+dx, y, 5+height, color.brown)
+        scene.add_brick("rect", 1, 6, 1, x+dx, y, 5+height, vec(0.5, 0.3, 0))
 
 build_house(my_project.brick_scenes[0], 0, 0)
 ```
@@ -588,3 +590,6 @@ With brick-stack, you can learn several programming techniques and see visual re
 
 ### Have fun!
 Create brick models with an unlimited supply of basic building bricks.
+
+#### Further educational ideas to be incorporated above:
+- define your own colors (-> work with variables)
