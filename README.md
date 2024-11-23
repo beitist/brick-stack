@@ -6,7 +6,7 @@ Brick-stack is a tiny python-library-to-be, with two main intentions:
 1. function as a learning tool with realtime visual feedback to teach basic and advanced concepts of programming through brick layout
 2. create building plans for (simple) brick projects.
 
-Brick-stack uses VPython for rendering.
+Brick-stack uses [VPython](https://vpython.org/) for rendering.
 
 # Participate
 If you are interested in developing this together, be it as a teacher, coder, beta-tester, reach out!
