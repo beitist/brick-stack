@@ -1,7 +1,15 @@
 # brick-stack
-A tiny python tool to create toy brick building plans, using VPython rendering functions.
 
-brick-stack is intended to serve as a learning tool as well as a toy for modelling simple brick models based on textfile input or cli.
+![hi-image displayed using bricks](/sample_img/hi-brick-stack.png)
+
+Brick-stack is a tiny python-library-to-be, with two main intentions:
+1. function as a learning tool with realtime visual feedback to teach basic and advanced concepts of programming through brick layout
+2. create building plans for (simple) brick projects.
+
+Brick-stack uses VPython for rendering.
+
+# Participate
+If you are interested in developing this together, be it as a teacher, coder, beta-tester, reach out!
 
 ## To Do
 - [x] auto-z
