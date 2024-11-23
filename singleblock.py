@@ -709,5 +709,14 @@ def hello_world():
     my_project.brick_scenes[0].add_brick(
         "rect", 1, 1, 1, 2, -2, 0, color.black 
     )
+    my_project.brick_scenes[0].add_brick(
+        "rect", 8, 1, 1, -5, -4, 0, color.red 
+    )
+    my_project.brick_scenes[0].add_brick(
+        "rect", 8, 1, 1, -5, -5, 0, color.yellow 
+    )
+    my_project.brick_scenes[0].add_brick(
+        "rect", 8, 1, 1, -5, -6, 0, color.blue 
+    )
 
 hello_world()

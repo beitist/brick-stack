@@ -1,6 +1,6 @@
 # brick-stack
 
-![hi-image displayed using bricks](/sample_img/hi-brick-stack.png)
+![hi-image displayed using bricks](/sample_img/hi-brick-stack2.png)
 
 Brick-stack is a tiny python-library-to-be, with two main intentions:
 1. function as a learning tool with realtime visual feedback to teach basic and advanced concepts of programming through brick layout
