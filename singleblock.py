@@ -11,10 +11,10 @@ import random
 GLOBAL_DEBUG = True
 
 # Turn on/off desired debug output
-CALC_DEBUG = False
-STUD_DEBUG = True
+CALC_DEBUG = True
+STUD_DEBUG = False
 GRID_DEBUG = False
-BRICK_DEBUG = False
+BRICK_DEBUG = True
 
 ##### COORDINATES #####
 ## x = length from left to right (standard camera view)
@@ -361,7 +361,7 @@ class BrickFactory:
         # custom_x/y: center (standard: 0,0)
         # specs = BasicBrick.BRICK_SPECS[brick_system]
 
-        if GLOBAL_DEBUG and CALC_DEBUG: print(f"Baseplate values: x: {baseplate_center_x}, y: {baseplate_center_y}, width: {baseplate_custom_width}, length: {baseplate_custom_length}")
+        if GLOBAL_DEBUG and CALC_DEBUG: print(f"Baseplate values: x: {baseplate_center_x}, y: {baseplate_center_y}, length: {baseplate_custom_length}, width: {baseplate_custom_width}")
 
         baseplate = Baseplate(brick_system, baseplate_color, baseplate_custom_length, baseplate_custom_width, baseplate_center_x, baseplate_center_y)
 
@@ -491,11 +491,11 @@ class Baseplate(BasicBrick):
     def __init__(self, brick_system, baseplate_color, baseplate_length : int = None, baseplate_width : int = None, baseplate_center_x : int = None, baseplate_center_y : int = None):
         super().__init__(brick_system)
         self.stud_x_counter = (
-            baseplate_length if baseplate_length is not None
+            baseplate_width if baseplate_width is not None
             else (24 if brick_system == "duplo" else 48)
         )
         self.stud_y_counter = (
-            baseplate_width if baseplate_width is not None
+            baseplate_length if baseplate_length is not None
             else (24 if brick_system == "duplo" else 48)
         )
         # this is not ideal - how to organise brick/baseplate classes?
@@ -522,16 +522,17 @@ class Baseplate(BasicBrick):
             else (self.specs["xy_factor"] * 0)
         )
         self.height = self.specs["baseplate_height"] * self.specs["xy_factor"]
-        self.lower_left_x = self.baseplate_center_x - self.baseplate_length * 0.5
-        self.lower_left_y = self.baseplate_center_y - self.baseplate_width * 0.5
+        self.lower_left_x = self.baseplate_center_x - self.baseplate_width * 0.5
+        self.lower_left_y = self.baseplate_center_y - self.baseplate_length * 0.5
         # Keep to make baseplate a child of rectangularbrick later
         self.lower_left_z = 0
 
         self.generate()
 
     def generate(self):
-        baseplate_linepath_z = [vec(0,0,0), 
-                                vec(0, 0, -0.15 * self.specs["xy_factor"])
+        # add baseplate to OccupancyGrid?
+        baseplate_linepath_z = [vec(0, 0, -0.15 * self.specs["xy_factor"]), 
+                                vec(0, 0, 0)
         ]
         baseplate_shape = shapes.rectangle(
             pos=[self.baseplate_center_x, self.baseplate_center_y],
@@ -685,39 +686,28 @@ class RectangularBrick(BasicBrick):
 
         return compound(brick_components)
 
-def create_simple_house():
-    # Initialisiere ein Projekt (z.B. "lego" für klassische Legosteine)
-    project = BrickProject(brick_system="lego", auto_z=True)
+my_project = BrickProject("lego")
+my_project.add_scene()
+my_project.brick_scenes[0].add_baseplate(color.green * 0.4, 16, 20)
 
-    # Szene hinzufügen
-    project.add_scene()
+def hello_world():
+    my_project.brick_scenes[0].add_brick(
+        "rect", 1, 8, 1, -5, -2, 0, color.black 
+    )
+    my_project.brick_scenes[0].add_brick(
+        "rect", 1, 8, 1, -2, -2, 0, color.black 
+    )
+    my_project.brick_scenes[0].add_brick(
+        "rect", 2, 1, 1, -4, 1, 0, color.black 
+    )
+    my_project.brick_scenes[0].add_brick(
+        "rect", 1, 8, 1, 0, -2, 0, color.black 
+    )
+    my_project.brick_scenes[0].add_brick(
+        "rect", 1, 6, 1, 2, 0, 0, color.black 
+    )
+    my_project.brick_scenes[0].add_brick(
+        "rect", 1, 1, 1, 2, -2, 0, color.black 
+    )
 
-    # Aktuelle Szene holen
-    scene = project.brick_scenes[-1]
-
-    # Basisplatte hinzufügen
-    scene.add_baseplate(baseplate_color=color.green, baseplate_custom_length=16, baseplate_custom_width=16)
-
-    # Grundstruktur des Hauses (Wände)
-    # Vorderwand
-    for x in range(0, 8, 2):
-        scene.add_brick(brick_type='rect', length=2, width=1, height=1, x_pos=x, y_pos=0, z_pos=0, brick_color=color.red)
-
-    # Rückwand
-    for x in range(0, 8, 2):
-        scene.add_brick(brick_type='rect', length=2, width=1, height=1, x_pos=x, y_pos=6, z_pos=0, brick_color=color.red)
-
-    # Seitenwände
-    for y in range(0, 7, 2):
-        scene.add_brick(brick_type='rect', length=1, width=2, height=1, x_pos=0, y_pos=y, z_pos=0, brick_color=color.blue)
-        scene.add_brick(brick_type='rect', length=1, width=2, height=1, x_pos=7, y_pos=y, z_pos=0, brick_color=color.blue)
-
-    # Dach (eine schräge Ebene aus 1x2 Steinen)
-    for x in range(0, 8, 2):
-        scene.add_brick(brick_type='rect', length=2, width=2, height=1, x_pos=x, y_pos=2, z_pos=3, brick_color=color.yellow)
-
-    # Projekt ist nun bereit. Du kannst es erweitern oder rendern.
-    print("Einfaches Haus wurde erfolgreich erstellt.")
-
-# Aufrufen der Funktion
-create_simple_house()
+hello_world()
