@@ -16,6 +16,12 @@ STUD_DEBUG = True
 GRID_DEBUG = False
 BRICK_DEBUG = True
 
+# global variables for x/y orientation
+NORTH = vector(0, 1, 0)  # +y-orientation
+EAST = vector(1, 0, 0)   # +x-orientation
+SOUTH = vector(0, -1, 0) # -y-orientation
+WEST = vector(-1, 0, 0)  # -x-orientation
+
 ##### COORDINATES #####
 ## x = length from left to right (standard camera view)
 ## y = width from front to back (standard camera view)
@@ -23,6 +29,12 @@ BRICK_DEBUG = True
 ## coordinates x, y, z correspond with l, w, h values
 #######################
 
+##### COORDINATES (NEW) #####
+## length = typically the longer side of a brick (e.g. 4)
+## width = typically the shorter side of a brick (e.g. 2)
+## orientation = N, S, E, W aligning with length when placed
+## x/y = corner of smallest x/y-coordinate (placing a brick always from "lower/left", no matter the orientation)
+## z = either automatic or manual
 
 ####### TO DO ########
 ## 0: close scenes? update cameras?
@@ -41,14 +53,12 @@ class BrickProject:
     """Class holding individual scenes (= steps in constructing a brick project)
     
     Will (soon) provide functionality for file handling of simplified project files"""
-    # v0.1c / 17.11.24 / beiti
     # planned use:
-    # - load project file?
-    # - save renders?
-    #
+    # - load project file
+    # - save renders
     #
     # description
-    # type = duplo/lego
+    # brick_system = duplo/lego
     # auto_z = True // turn off by initialising project with auto_z = False
     
     def __init__(self, brick_system, auto_z = True):
@@ -61,7 +71,6 @@ class BrickProject:
         Additional Variables:
             brick_scenes (array): empty array to store brick_scenes (int-index)
         """
-
         self.brick_scenes = []
         self.brick_system = brick_system
         self.auto_z = auto_z        
@@ -84,7 +93,6 @@ class BrickProject:
             special_camera (obj): vpython-camera object, optional
             
         Scenes are appended to the brick_scene array."""
-        
         brick_scene = BrickScene(self, special_canvas, special_camera)
         self.brick_scenes.append(brick_scene)
 
@@ -109,7 +117,7 @@ class OccupancyGrid:
             height (int): see above
         """
         if GLOBAL_DEBUG and GRID_DEBUG: print(f"Function add_brick/OccupancyGrid: adding brick at ({x},{y}) with w={width}, l={length}")
-        # Für jeden Punkt, den der Stein belegt
+        # for every point occupied by a brick
         for dx in range(length):
             for dy in range(width):
                 point = (x + dx, y + dy)
@@ -129,8 +137,6 @@ class OccupancyGrid:
         # obtain max z
         for z_summary_of_coordinate in self.points:
             if GLOBAL_DEBUG and CALC_DEBUG: print(f"value {self.points[z_summary_of_coordinate]}, key: {z_summary_of_coordinate}")
-            # z_start_end = self.points[z_summary_of_coordinate]
-            
             for z_minmax_value in self.points[z_summary_of_coordinate]:
                 z_start, z_end = z_minmax_value
                 if z_start < min_z : min_z = z_start
@@ -154,7 +160,7 @@ class OccupancyGrid:
             "max_z" : max_z
         }
 
-        print(results)
+        if GLOBAL_DEBUG and CALC_DEBUG: print(results)
 
         return results
 
@@ -177,7 +183,7 @@ class OccupancyGrid:
 
 class BrickScene:
     """BrickScene is a functional container for individual brick scenes
-    and provides camera and scene settings
+    and provides orientation, camera and scene settings
     """
 
     def __init__(self, project, special_scene=None, special_camera=None):
@@ -262,15 +268,15 @@ class BrickScene:
         current_canvas.camera.pos = vector((max_x - dx/2) * self.bricks[-1].specs["xy_factor"], -30, 80)
 
     def calculate_z_pos(self, length, width, height, x_pos, y_pos):
-       # Finde kleinstes mögliches z
+       # Find smallest possible z
         z = self.grid.get_next_z(x_pos, y_pos, length, width)
-        # Runde auf nächste valide Höhe
+        # round up to next valid height
         if self.brick_system == "duplo":
-            # Runde auf Vielfaches von 0.5 (oder 3 in deinem System)
+            # round to multiples of 1/2
             if GLOBAL_DEBUG and (BRICK_DEBUG or GRID_DEBUG): print(f"z before rounding: {z}")
             z = ceil(z * 2) / 2
         else:  # lego
-            # Runde auf Vielfaches von 1/3
+            # round to multiples of 1/3
             z = ceil(z * 3) / 3
         return z
     
@@ -278,7 +284,6 @@ class BrickScene:
         xyz_range = self.grid.get_xyz_range(self)       
 
     def add_brick(self, brick_type : str, length : int, width : int, height : int, x_pos : int, y_pos : int, z_pos : int, brick_color : vector, brick_orientation : vector):
-        # Orientation is not 100% working yet! Has to influence x/y, or?
         """Add a new brick to your project/scene
 
         Args:
@@ -359,8 +364,6 @@ class BrickFactory:
     @staticmethod
     def create_baseplate(brick_system, baseplate_color, baseplate_custom_length, baseplate_custom_width, baseplate_center_x, baseplate_center_y):
         # custom_x/y: center (standard: 0,0)
-        # specs = BasicBrick.BRICK_SPECS[brick_system]
-
         if GLOBAL_DEBUG and CALC_DEBUG: print(f"Baseplate values: x: {baseplate_center_x}, y: {baseplate_center_y}, length: {baseplate_custom_length}, width: {baseplate_custom_width}")
 
         baseplate = Baseplate(brick_system, baseplate_color, baseplate_custom_length, baseplate_custom_width, baseplate_center_x, baseplate_center_y)
@@ -375,9 +378,9 @@ class BrickFactory:
             vector: RGB-vector for use with vpython
         """
         random.seed()
-        red = random.randint(0, 10) / 10
-        green = random.randint(0, 10) / 10
-        blue = random.randint(0, 10) / 10
+        red = random.randint(0, 5) / 5
+        green = random.randint(0, 5) / 5
+        blue = random.randint(0, 5) / 5
 
         return vector(red, green, blue)
 
@@ -396,12 +399,6 @@ class BasicBrick:
     # ======
     # generic lego/duplo for all bricks, in mm
     # additional tools / info
-
-    # class variables for x/y orientation
-    NORTH = vector(0, 1, 0)  # +y-orientation
-    EAST = vector(1, 0, 0)   # +x-orientation
-    SOUTH = vector(0, -1, 0) # -y-orientation
-    WEST = vector(-1, 0, 0)  # -x-orientation
 
     # class variables for mm-dimensions
     BRICK_SPECS = {
@@ -584,17 +581,10 @@ class Baseplate(BasicBrick):
 
 
 class RectangularBrick(BasicBrick):
-    # TO DO: 
-    #   - Unterseite vom Stein modellieren
-    #   - Farbcodes offener wählen, um Render-Engine flexibel zu halten
-    #   - Scene-Standardwerte an Klasse übergeben, sofern vorhanden
-    #   - Sonderformen definieren
-    #   - separate brick-objects from brick-renders (?)
-
     def __init__(self, brick_system: str, length: int = 4, width: int = 2, height: int = 1, 
                  x: int = 0, y: int = 0, z: int = 0, 
                  brick_color: vector = color.red,
-                 orientation: vector = vector(1, 0, 0)):
+                 orientation: vector = vector(0, 1, 0)):
         """Rectangular Brick __init__
 
         Generates a 3d-object of a rectangular brick with specified options.
@@ -608,6 +598,7 @@ class RectangularBrick(BasicBrick):
             y (int, optional): Y-Position of front left corner of brick. Defaults to 0.
             z (int, optional): Z-Position of front left corner of brick. Defaults to 0.
             brick_color (vector or vpython color, optional): vector(R, G, B) or color.name (from vpython std). Defaults to color.red.
+            orientation (vector): user input to determine the orientation of the brick
         """
         super().__init__(brick_system)
         self.orientation = orientation
