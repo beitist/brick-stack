@@ -16,11 +16,22 @@ STUD_DEBUG = True
 GRID_DEBUG = False
 BRICK_DEBUG = True
 
-# global variables for x/y orientation
-NORTH = vector(0, 1, 0)  # +y-orientation
-EAST = vector(1, 0, 0)   # +x-orientation
-SOUTH = vector(0, -1, 0) # -y-orientation
-WEST = vector(-1, 0, 0)  # -x-orientation
+
+# Expanding vector-class from vpython:
+class DirectionalVector(vector):
+    @property
+    def rotation(self):
+        return {
+            (0,1,0): 0,      # North
+            (1,0,0): 3*pi/2, # East
+            (0,-1,0): pi,    # South
+            (-1,0,0): pi/2   # West
+        }[(self.x, self.y, self.z)]
+
+NORTH = DirectionalVector(0,1,0)
+EAST = DirectionalVector(1,0,0)
+SOUTH = DirectionalVector(0,-1,0)
+WEST = DirectionalVector(-1,0,0)
 
 ##### COORDINATES #####
 ## x = length from left to right (standard camera view)
@@ -388,13 +399,6 @@ class BrickFactory:
 class BasicBrick:
     """Parent class for all bricks containing general information and a testing format
     """
-    # v0.1 / 11.11.24 / beiti
-    #
-    # PARAMETER:
-    # ==========
-    # brick_system = lego/duplo
-    # color = VPython color code
-    #
     # SPECS:
     # ======
     # generic lego/duplo for all bricks, in mm
@@ -602,14 +606,8 @@ class RectangularBrick(BasicBrick):
         """
         super().__init__(brick_system)
         self.orientation = orientation
-        # adjust length/width based on orientation
-        if orientation in [self.EAST, self.WEST]:
-            self.length, self.width = width * self.specs["xy_factor"], length * self.specs["xy_factor"]
-            self.stud_x_counter, self.stud_y_counter = width, length
-        else:
-            self.length = length * self.specs["xy_factor"]
-            self.width = width * self.specs["xy_factor"]
-            self.stud_x_counter, self.stud_y_counter = length, width
+        self.stud_x_counter = width
+        self.stud_y_counter = length
         self.length = length * self.specs["xy_factor"]
         self.width = width * self.specs["xy_factor"]
         self.height = height * self.specs["z_factor"]
@@ -617,6 +615,7 @@ class RectangularBrick(BasicBrick):
         self.y = y * self.specs["xy_factor"]
         self.z = z * self.specs["z_factor"]
         self.brick_color=brick_color
+        self.orientation = orientation
 
         self.generate()
 
@@ -634,13 +633,15 @@ class RectangularBrick(BasicBrick):
             print(f'length: {self.length}, width: {self.width}, height: {self.height}')
             print(f"stud-x-counter: {self.stud_x_counter}, stud-y-counter: {self.stud_y_counter}")
         
+        # 1. create box in standard orientation (North)
+        #### this is important for irregular boxes where North ≠ South
         brick_basis = box(
             pos = vec(
                 self.x + self.length/2, 
                 self.y + self.width/2, 
                 self.z + self.height/2
             ),
-            axis = vector(1,0,0),
+            axis = vector(0,1,0),
             length = self.length,
             height = self.height,
             width = self.width,
@@ -662,7 +663,20 @@ class RectangularBrick(BasicBrick):
                     wall_thickness = self.specs["stud_wall_thickness"]
                 )
                 brick_components.append(stud)
-        return compound(brick_components)
+
+        brick_compound = compound(brick_components)
+        
+        # 3. Rotate box according to orientation
+        brick_compound.rotate(angle = self.orientation.rotation, axis = vector(0,0,1))
+
+        # 4. move box
+        brick_compound.pos = vector(
+            self.x + brick_compound.height / 2,
+            self.y + brick_compound.width / 2,
+            self.z + brick_compound.height / 2
+        )
+
+        return brick_compound
 
 my_project = BrickProject("lego")
 my_project.add_scene()
