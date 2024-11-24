@@ -11,8 +11,8 @@ import random
 GLOBAL_DEBUG = True
 
 # Turn on/off desired debug output
-CALC_DEBUG = True
-STUD_DEBUG = False
+CALC_DEBUG = False
+STUD_DEBUG = True
 GRID_DEBUG = False
 BRICK_DEBUG = True
 
@@ -179,20 +179,7 @@ class BrickScene:
     """BrickScene is a functional container for individual brick scenes
     and provides camera and scene settings
     """
-    # v0.1 / 17.11.24 / beiti
-    # planned use:
-    # hold individual scenes consisting of multiple bricks + optional camera / render / view setting
-    # render full scene, possibly some more options
-    #
-    # to do:
-    # - camera object
-    # - camera calculation
-    # - special scenes
 
-    # Parameter description:
-    # special_camera = camera object for manual positioning of camera for scene
-    # special_scene = scene details (width, height, ...) -> new obect?
-    # brick_scene inherits type and project
     def __init__(self, project, special_scene=None, special_camera=None):
         """__init__ brick_scene
 
@@ -322,12 +309,8 @@ class BrickScene:
     def get_my_scene_index(self):
         return self.project.get_scene_index(self)
 
+
 class BrickFactory:
-    # v0.1 / 16.11.24 / beiti
-    # generates bricks for scenes
-    
-    # space for many types of bricks
-    # needs failover if type is not implemented
     @staticmethod
     def create_brick(brick_system, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
         if brick_color == "random":
@@ -406,7 +389,8 @@ class BasicBrick:
             "stud_spacing": 7.8,
             "stud_wall_thickness": 0,
             "is_hollow": False,
-            "baseplate_height" : 0.15
+            "baseplate_height" : 0.15,
+            "baseplate_roundness" : 0.02
         },
 
         # due to likely render issues, stud diameter is reduced by half of wall thickness
@@ -419,7 +403,8 @@ class BasicBrick:
             "stud_spacing": 15.6,
             "stud_wall_thickness": 2.2,
             "is_hollow": True,
-            "baseplate_height" : 0.15           
+            "baseplate_height" : 0.15,
+            "baseplate_roundness" : 0.08          
         },
 
         "test": {
@@ -487,6 +472,7 @@ class BasicBrick:
  
         return generated_stud
 
+
 class Baseplate(BasicBrick):
     def __init__(self, brick_system, baseplate_color, baseplate_length : int = None, baseplate_width : int = None, baseplate_center_x : int = None, baseplate_center_y : int = None):
         super().__init__(brick_system)
@@ -531,68 +517,50 @@ class Baseplate(BasicBrick):
 
     def generate(self):
         # add baseplate to OccupancyGrid?
+        # 1: extrude baseplate from shape
         baseplate_linepath_z = [vec(0, 0, -0.15 * self.specs["xy_factor"]), 
                                 vec(0, 0, 0)
         ]
         baseplate_shape = shapes.rectangle(
             pos=[self.baseplate_center_x, self.baseplate_center_y],
             width = self.baseplate_width,
-            height = self.baseplate_length
+            height = self.baseplate_length,
+            roundness = self.specs["baseplate_roundness"]
         )
         baseplate_extrusion = extrusion(
             shape = baseplate_shape,
             path = baseplate_linepath_z,
             color = self.brick_color
         )
-
         baseplate_compound = [baseplate_extrusion]
 
-        if GLOBAL_DEBUG and STUD_DEBUG: print(f"Before x/y for: stud_x_counter: {self.stud_x_counter}, stud_y_counter: {self.stud_y_counter}")
-
-        # duplo: corner-studs do not exist!
+        # 2: add studs
+        # duplo: corner-studs do not exist on baseplate
+        # duplo: baseplate studs are massive, not hollow
         for x_stud in (range(int(self.stud_x_counter))):
             for y_stud in (range(int(self.stud_y_counter))):
+                if (self.brick_system == "duplo" and 
+                    (x_stud == 0 or x_stud == int(self.stud_x_counter)-1) and 
+                    (y_stud == 0 or y_stud == int(self.stud_y_counter)-1)):
+                    pass
+                else:
+                    stud_center = vec(
+                        self.lower_left_x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"]),
+                        self.lower_left_y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"]),
+                        self.lower_left_z + self.height)
 
-                if GLOBAL_DEBUG and STUD_DEBUG:
-                    brick_center_x = self.baseplate_center_x
-                    brick_center_y = self.baseplate_center_y    
-                    
-                    stud_x = self.lower_left_x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"])
-                    stud_y = self.lower_left_y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"])
-                    
-                    print("Checking stud position in generate-call (3d) / BASEPLATE!")
-                    print(f"Brick center: ({brick_center_x}, {brick_center_y})")
-                    print(f"Stud position: ({stud_x}, {stud_y})")
+                    stud = self.generate_stud(
+                        pos = stud_center,
+                        hollow = False,
+                        wall_thickness = self.specs["stud_wall_thickness"]
+                    )
 
-                stud_center = vec(
-                    self.lower_left_x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"]),
-                    self.lower_left_y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"]),
-                    self.lower_left_z + self.height)
-
-                stud = self.generate_stud(
-                    pos = stud_center,
-                    hollow = self.specs["is_hollow"],
-                    wall_thickness = self.specs["stud_wall_thickness"]
-                )
-
-                baseplate_compound.append(stud)
+                    baseplate_compound.append(stud)
 
         return compound(baseplate_compound)
 
 
 class RectangularBrick(BasicBrick):
-    # v0.2a / 17.11.24 / beiti
-    #
-    # PARAMETER:
-    # ==========
-    # length, width, height = int
-    # x, y, z = int
-    # color = VPython Farbcode
-    # type = lego/duplo
-    # x = width
-    # y = length
-    #
-    #
     # TO DO: 
     #   - Unterseite vom Stein modellieren
     #   - Farbcodes offener wählen, um Render-Engine flexibel zu halten
@@ -600,7 +568,7 @@ class RectangularBrick(BasicBrick):
     #   - Sonderformen definieren
     #   - separate brick-objects from brick-renders (?)
 
-    def __init__(self, brick_system, length=4, width=2, height=1, x=0, y=0, z=0, brick_color=color.red):
+    def __init__(self, brick_system : str, length : int = 4, width : int = 2, height : int = 1, x : int = 0, y : int = 0, z : int = 0, brick_color : vector = color.red):
         """Rectangular Brick __init__
 
         Generates a 3d-object of a rectangular brick with specified options.
@@ -659,31 +627,17 @@ class RectangularBrick(BasicBrick):
         brick_components = [brick_basis]
         for x_stud in range(int(self.stud_x_counter)):
             for y_stud in range(0, int(self.stud_y_counter)):
-
-                if GLOBAL_DEBUG and STUD_DEBUG:
-                    brick_center_x = self.x + self.length/2
-                    brick_center_y = self.y + self.width/2     
-                    
-                    stud_x = self.x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"])
-                    stud_y = self.y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"])
-                    
-                    print("Checking stud position in generate-call (3d)")
-                    print(f"Brick center: ({brick_center_x}, {brick_center_y})")
-                    print(f"Stud position: ({stud_x}, {stud_y})")
-
                 stud_center = vec(
                     self.x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"]),
                     self.y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"]),
-                    self.z + self.height)
-
+                    self.z + self.height
+                )
                 stud = self.generate_stud(
                     pos = stud_center,
                     hollow = self.specs["is_hollow"],
                     wall_thickness = self.specs["stud_wall_thickness"]
                 )
-
                 brick_components.append(stud)
-
         return compound(brick_components)
 
 my_project = BrickProject("lego")
