@@ -277,7 +277,21 @@ class BrickScene:
     def calculate_xyz_range(self):
         xyz_range = self.grid.get_xyz_range(self)       
 
-    def add_brick(self, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
+    def add_brick(self, brick_type : str, length : int, width : int, height : int, x_pos : int, y_pos : int, z_pos : int, brick_color : vector, brick_orientation : vector):
+        # Orientation is not 100% working yet! Has to influence x/y, or?
+        """Add a new brick to your project/scene
+
+        Args:
+            brick_type (str): Choose from "rect" or "rect" ;-) - more to come
+            length (int): Length of the brick in number of studs (x-direction / "left to right")
+            width (int): Width in number of studs
+            height (int): Height in basic heights, use: .5, 1, 2 for duplo, .33, .66, 1, 2 for lego
+            x_pos (int): x-position of the left bottom corner (in North-orientation)
+            y_pos (int): see above
+            z_pos (int): see above
+            brick_color (vector): vector(r, g, b) or predefined color.x
+            brick_orientation (vector): NORTH, SOUTH, EAST, WEST
+        """
         # auto-z or not
         if self.project.auto_z:
             z_pos = self.calculate_z_pos(length, width, height, x_pos, y_pos)
@@ -296,7 +310,8 @@ class BrickScene:
                                           x_pos, 
                                           y_pos, 
                                           z_pos, 
-                                          brick_color)
+                                          brick_color,
+                                          brick_orientation)
         
         self.bricks.append(brick)
 
@@ -312,7 +327,7 @@ class BrickScene:
 
 class BrickFactory:
     @staticmethod
-    def create_brick(brick_system, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
+    def create_brick(brick_system, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color, brick_orientation):
         if brick_color == "random":
             final_brick_color = BrickFactory.choose_random_color()
         else:
@@ -326,7 +341,8 @@ class BrickFactory:
                                      x_pos, 
                                      y_pos, 
                                      z_pos, 
-                                     final_brick_color)
+                                     final_brick_color,
+                                     brick_orientation)
         else:
             brick = RectangularBrick(brick_system,
                                      length, 
@@ -335,7 +351,8 @@ class BrickFactory:
                                      x_pos,
                                      y_pos, 
                                      z_pos, 
-                                     final_brick_color)
+                                     final_brick_color,
+                                     brick_orientation)
 
         return brick  
 
@@ -378,7 +395,15 @@ class BasicBrick:
     # SPECS:
     # ======
     # generic lego/duplo for all bricks, in mm
+    # additional tools / info
 
+    # class variables for x/y orientation
+    NORTH = vector(0, 1, 0)  # +y-orientation
+    EAST = vector(1, 0, 0)   # +x-orientation
+    SOUTH = vector(0, -1, 0) # -y-orientation
+    WEST = vector(-1, 0, 0)  # -x-orientation
+
+    # class variables for mm-dimensions
     BRICK_SPECS = {
         "lego": {
             "xy_factor": 7.8,
@@ -418,8 +443,6 @@ class BasicBrick:
             "is_hollow": False    
         }
     }
-
-    #brick_system = None
         
     def __init__(self, brick_system):
         """Parent brick class __init__
@@ -568,7 +591,10 @@ class RectangularBrick(BasicBrick):
     #   - Sonderformen definieren
     #   - separate brick-objects from brick-renders (?)
 
-    def __init__(self, brick_system : str, length : int = 4, width : int = 2, height : int = 1, x : int = 0, y : int = 0, z : int = 0, brick_color : vector = color.red):
+    def __init__(self, brick_system: str, length: int = 4, width: int = 2, height: int = 1, 
+                 x: int = 0, y: int = 0, z: int = 0, 
+                 brick_color: vector = color.red,
+                 orientation: vector = vector(1, 0, 0)):
         """Rectangular Brick __init__
 
         Generates a 3d-object of a rectangular brick with specified options.
@@ -584,8 +610,15 @@ class RectangularBrick(BasicBrick):
             brick_color (vector or vpython color, optional): vector(R, G, B) or color.name (from vpython std). Defaults to color.red.
         """
         super().__init__(brick_system)
-        self.stud_x_counter = length
-        self.stud_y_counter = width
+        self.orientation = orientation
+        # adjust length/width based on orientation
+        if orientation in [self.EAST, self.WEST]:
+            self.length, self.width = width * self.specs["xy_factor"], length * self.specs["xy_factor"]
+            self.stud_x_counter, self.stud_y_counter = width, length
+        else:
+            self.length = length * self.specs["xy_factor"]
+            self.width = width * self.specs["xy_factor"]
+            self.stud_x_counter, self.stud_y_counter = length, width
         self.length = length * self.specs["xy_factor"]
         self.width = width * self.specs["xy_factor"]
         self.height = height * self.specs["z_factor"]
@@ -646,10 +679,10 @@ my_project.brick_scenes[0].add_baseplate(color.green * 0.4, 16, 20)
 
 def hello_world():
     my_project.brick_scenes[0].add_brick(
-        "rect", 1, 8, 1, -5, -2, 0, color.black 
+        "rect", 8, 1, 1, -5, -2, 0, color.black, EAST
     )
     my_project.brick_scenes[0].add_brick(
-        "rect", 1, 8, 1, -2, -2, 0, color.black 
+        "rect", 8, 1, 1, -2, -2, 0, color.black, EAST 
     )
     my_project.brick_scenes[0].add_brick(
         "rect", 2, 1, 1, -4, 1, 0, color.black 
