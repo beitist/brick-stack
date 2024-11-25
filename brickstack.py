@@ -13,8 +13,9 @@ GLOBAL_DEBUG = True
 # Turn on/off desired debug output
 CALC_DEBUG = False
 STUD_DEBUG = True
-GRID_DEBUG = False
+GRID_DEBUG = True
 BRICK_DEBUG = True
+STOP_DEBUG = False
 
 
 # Expanding vector-class from vpython:
@@ -294,7 +295,7 @@ class BrickScene:
     def calculate_xyz_range(self):
         xyz_range = self.grid.get_xyz_range(self)       
 
-    def add_brick(self, brick_type : str, length : int, width : int, height : int, x_pos : int, y_pos : int, z_pos : int, brick_color : vector, brick_orientation : vector):
+    def add_brick(self, brick_type : str = "rect", length : int = 4, width : int = 2, height : int = 1, x_pos : int = 0, y_pos : int = 0, z_pos : int = 0, brick_color : vector = color.red, brick_orientation : vector = NORTH):
         """Add a new brick to your project/scene
 
         Args:
@@ -535,14 +536,14 @@ class Baseplate(BasicBrick):
         self.lower_left_x = self.baseplate_center_x - self.baseplate_width * 0.5
         self.lower_left_y = self.baseplate_center_y - self.baseplate_length * 0.5
         # Keep to make baseplate a child of rectangularbrick later
-        self.lower_left_z = 0
+        self.lower_left_z = -0.15
 
         self.generate()
 
     def generate(self):
         # add baseplate to OccupancyGrid?
         # 1: extrude baseplate from shape
-        baseplate_linepath_z = [vec(0, 0, -0.15 * self.specs["xy_factor"]), 
+        baseplate_linepath_z = [vec(0, 0, self.lower_left_z * self.specs["xy_factor"]), 
                                 vec(0, 0, 0)
         ]
         baseplate_shape = shapes.rectangle(
@@ -585,13 +586,14 @@ class Baseplate(BasicBrick):
 
 
 class RectangularBrick(BasicBrick):
-    def __init__(self, brick_system: str, length: int = 4, width: int = 2, height: int = 1, 
-                 x: int = 0, y: int = 0, z: int = 0, 
-                 brick_color: vector = color.red,
-                 orientation: vector = vector(0, 1, 0)):
+    def __init__(self, brick_system: str, length: int, width: int, height: int, 
+                 x: int, y: int, z: int, 
+                 brick_color: vector,
+                 orientation: vector):
         """Rectangular Brick __init__
 
         Generates a 3d-object of a rectangular brick with specified options.
+        Is usually called from scene.
 
         Args:
             brick_system (str): received from super; handed over from BrickProject
@@ -602,19 +604,18 @@ class RectangularBrick(BasicBrick):
             y (int, optional): Y-Position of front left corner of brick. Defaults to 0.
             z (int, optional): Z-Position of front left corner of brick. Defaults to 0.
             brick_color (vector or vpython color, optional): vector(R, G, B) or color.name (from vpython std). Defaults to color.red.
-            orientation (vector): user input to determine the orientation of the brick
+            orientation (vector): user input to determine the orientation of the brick, use NORTH, EAST, SOUTH, WEST
         """
         super().__init__(brick_system)
-        self.orientation = orientation
-        self.stud_x_counter = width
-        self.stud_y_counter = length
+        self.stud_x_counter = width # x-axis in NORTH orientation (0,1,0)
+        self.stud_y_counter = length # y-axis in NORTH orientation
         self.length = length * self.specs["xy_factor"]
         self.width = width * self.specs["xy_factor"]
         self.height = height * self.specs["z_factor"]
         self.x = x * self.specs["xy_factor"]
         self.y = y * self.specs["xy_factor"]
         self.z = z * self.specs["z_factor"]
-        self.brick_color=brick_color
+        self.brick_color = brick_color
         self.orientation = orientation
 
         self.generate()
@@ -629,7 +630,7 @@ class RectangularBrick(BasicBrick):
             compound (obj::vpython): 3d compound representing the rendered brick
         """
         if GLOBAL_DEBUG and (STUD_DEBUG or BRICK_DEBUG): 
-            print(f"Generating 3d-brick:\nX: {self.x}, Y: {self.y}, Z: {self.z}")
+            print(f"Generating 3d-brick:\n-------------------\nX: {self.x}, Y: {self.y}, Z: {self.z}")
             print(f'length: {self.length}, width: {self.width}, height: {self.height}')
             print(f"stud-x-counter: {self.stud_x_counter}, stud-y-counter: {self.stud_y_counter}")
         
@@ -637,17 +638,22 @@ class RectangularBrick(BasicBrick):
         #### this is important for irregular boxes where North ≠ South
         brick_basis = box(
             pos = vec(
-                self.x + self.length/2, 
-                self.y + self.width/2, 
+                self.x + self.width/2, 
+                self.y + self.length/2, 
                 self.z + self.height/2
             ),
-            axis = vector(0,1,0),
+            axis = vector(0,1,0), # follows length
             length = self.length,
             height = self.height,
             width = self.width,
             color = self.brick_color,
             up = vector(0,0,1)
         )
+
+        if GLOBAL_DEBUG and BRICK_DEBUG: 
+            print(f"Box generated with:\n-------------------\npos: {brick_basis.pos}\nand l,w,h: {brick_basis.length}, {brick_basis.width}, {brick_basis.height}")
+            print(f"Self remains with: x,y,z: {self.x}, {self.y}, {self.z}; stud-spacing: {self.specs["stud_spacing"]}, first stud x: {self.x + self.specs["stud_xy_offset"] + (0 * self.specs["stud_spacing"])}")
+            if STOP_DEBUG: temp_in = input("Weiter.")
 
         brick_components = [brick_basis]
         for x_stud in range(int(self.stud_x_counter)):
@@ -664,17 +670,42 @@ class RectangularBrick(BasicBrick):
                 )
                 brick_components.append(stud)
 
-        brick_compound = compound(brick_components)
+        brick_compound = compound(brick_components, axis = NORTH, up = vector(0,0,1))
+
+        print(brick_compound)
+
+        if GLOBAL_DEBUG and BRICK_DEBUG: print(f"Compound generated with:\n--------------------\npos: {brick_compound.pos} and l,w,h: {brick_compound.length}, {brick_compound.width}, {brick_compound.height}")
         
         # 3. Rotate box according to orientation
+        if GLOBAL_DEBUG and BRICK_DEBUG: print(f"Rotating brick at center point: {brick_compound.pos}")
         brick_compound.rotate(angle = self.orientation.rotation, axis = vector(0,0,1))
 
         # 4. move box
-        brick_compound.pos = vector(
-            self.x + brick_compound.height / 2,
-            self.y + brick_compound.width / 2,
-            self.z + brick_compound.height / 2
-        )
+        if GLOBAL_DEBUG and BRICK_DEBUG: print(f"Moving box with x, y, z: {self.x}, {self.y}, {self.z} and l,w,h: {brick_compound.length}, {brick_compound.width}, {brick_compound.height}")
+        if self.orientation == NORTH:
+            brick_compound.pos = vector(
+                self.x + brick_compound.width / 2,
+                self.y + brick_compound.length / 2,
+                self.z + brick_compound.height / 2
+            )
+        elif self.orientation == EAST:
+            brick_compound.pos = vector(
+                self.x + brick_compound.width / 2,
+                self.y + brick_compound.length / 2,
+                self.z + brick_compound.height / 2
+            )
+        elif self.orientation == SOUTH:
+            brick_compound.pos = vector(
+                self.x + brick_compound.width / 2,
+                self.y + brick_compound.length / 2,
+                self.z + brick_compound.height / 2
+            )
+        elif self.orientation == WEST:
+            brick_compound.pos = vector(
+                self.x + brick_compound.width / 2,
+                self.y + brick_compound.length / 2,
+                self.z + brick_compound.height / 2
+            )
 
         return brick_compound
 
@@ -682,33 +713,51 @@ my_project = BrickProject("lego")
 my_project.add_scene()
 my_project.brick_scenes[0].add_baseplate(color.green * 0.4, 16, 20)
 
-def hello_world():
-    my_project.brick_scenes[0].add_brick(
-        "rect", 8, 1, 1, -5, -2, 0, color.black, EAST
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 8, 1, 1, -2, -2, 0, color.black, EAST 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 2, 1, 1, -4, 1, 0, color.black 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 1, 8, 1, 0, -2, 0, color.black 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 1, 6, 1, 2, 0, 0, color.black 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 1, 1, 1, 2, -2, 0, color.black 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 8, 1, 1, -5, -4, 0, color.red 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 8, 1, 1, -5, -5, 0, color.yellow 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 8, 1, 1, -5, -6, 0, color.blue 
-    )
+# def hello_world():
+#     my_project.brick_scenes[0].add_brick(
+#         "rect", 8, 1, 1, -5, -2, 0, color.black, EAST
+#     )
+#     my_project.brick_scenes[0].add_brick(
+#         "rect", 8, 1, 1, -2, -2, 0, color.black, EAST 
+#     )
+#     my_project.brick_scenes[0].add_brick(
+    #     "rect", 2, 1, 1, -4, 1, 0, color.black 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 1, 8, 1, 0, -2, 0, color.black 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 1, 6, 1, 2, 0, 0, color.black 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 1, 1, 1, 2, -2, 0, color.black 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 8, 1, 1, -5, -4, 0, color.red 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 8, 1, 1, -5, -5, 0, color.yellow 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 8, 1, 1, -5, -6, 0, color.blue 
+    # )
 
-hello_world()
+# hello_world()
+
+# my_project.brick_scenes[0].add_brick(
+#         "rect", 8, 2, 1, 0, 0, 0, color.black, NORTH
+# )
+
+my_project.brick_scenes[0].add_brick(
+    "rect", 4, 2, 1, 0, 0, 0, color.black, EAST
+)
+
+x_marker = curve(pos=[vec(-15 * 9.6, 0, 0.5), vec(15 * 9.6, 0, 0.5)], color=color.yellow)
+y_marker = curve(pos=[vec(0, -15 * 9.6, 0.5), vec(0, 15 * 9.6, 0.5)], color=color.blue)
+z_marker = curve(pos=[vec(0, 0, -15 * 9.6), vec(0, 0, 15 * 9.6)], color=color.red)
+x_text = label(pos=vec(-8 * 9.6, 0, 0.5), text='x-axis', xoffset=-1 * 9.6, yoffset= 2 * 9.6, space= 3, height= 16, border=4, font='sans', background = color.white, color = color.black)
+y_text = label(pos=vec(0, -8 * 9.6, 0.5), text='y-axis', xoffset=-1 * 9.6, yoffset= 2 * 9.6, space= 3, height= 16, border=4, font='sans', background = color.white, color = color.black)
+
+
+my_project.brick_scenes[0].bricks.append(x_marker)
+my_project.brick_scenes[0].bricks.append(y_marker)
