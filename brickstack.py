@@ -636,6 +636,11 @@ class RectangularBrick(BasicBrick):
         
         # 1. create box in standard orientation (North)
         #### this is important for irregular boxes where North ≠ South
+        #### NOTICE: vpython compounds ALWAYS end up with:
+        #### axis = (x,0,0) and up = (0,y,0) with unclear dimensions, 
+        #### although they don't matter.
+        #### This does affect the length, width, height info:
+        #### 
         brick_basis = box(
             pos = vec(
                 self.x + self.width/2, 
@@ -656,6 +661,21 @@ class RectangularBrick(BasicBrick):
             if STOP_DEBUG: temp_in = input("Weiter.")
 
         brick_components = [brick_basis]
+
+        if GLOBAL_DEBUG and BRICK_DEBUG:
+            brick_length = curve(pos=[vec(0, self.y, 0), vec(0, self.length, 0)], color=color.yellow)
+            brick_width = curve(pos=[vec(self.x, 0, 0), vec(self.width, 0, 0)], color=color.yellow)
+            brick_height = curve(pos=[vec(0, 0, self.z), vec(0, 0, self.height)], color=color.yellow)
+            brick_x_text = label(pos=vec(self.width/2, -5, 5), text='width', xoffset=-1, yoffset= 2, space= 2, height= 16, border=4, font='sans', background = color.white, color = color.black)
+            brick_y_text = label(pos=vec(-5, self.length/2, 5), text='length', xoffset=-1, yoffset= 2, space= 2, height= 16, border=4, font='sans', background = color.white, color = color.black)
+            brick_z_text = label(pos=vec(-5, 5, self.height/2), text='height', xoffset=-1, yoffset= 2, space= 2, height= 16, border=4, font='sans', background = color.white, color = color.black)
+            brick_components.append(brick_length)
+            brick_components.append(brick_x_text)
+            brick_components.append(brick_width)
+            brick_components.append(brick_y_text)
+            brick_components.append(brick_height)
+            brick_components.append(brick_z_text)
+
         for x_stud in range(int(self.stud_x_counter)):
             for y_stud in range(0, int(self.stud_y_counter)):
                 stud_center = vec(
@@ -685,6 +705,7 @@ class RectangularBrick(BasicBrick):
         if STOP_DEBUG: stops = input("Weiter?")
 
         # 4. move box
+
         if GLOBAL_DEBUG and BRICK_DEBUG:
             print(f"Moving box with x, y, z: {self.x}, {self.y}, {self.z} and l,w,h: {brick_compound.length}, {brick_compound.width}, {brick_compound.height}")
             print(f"--- axis: {brick_compound.axis}, up-vector: {brick_compound.up}")
