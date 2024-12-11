@@ -669,12 +669,6 @@ class RectangularBrick(BasicBrick):
             brick_x_text = label(pos=vec(self.width/2, -5, 5), text='width', xoffset=-1, yoffset= 2, space= 2, height= 16, border=4, font='sans', background = color.white, color = color.black)
             brick_y_text = label(pos=vec(-5, self.length/2, 5), text='length', xoffset=-1, yoffset= 2, space= 2, height= 16, border=4, font='sans', background = color.white, color = color.black)
             brick_z_text = label(pos=vec(-5, 5, self.height/2), text='height', xoffset=-1, yoffset= 2, space= 2, height= 16, border=4, font='sans', background = color.white, color = color.black)
-            brick_components.append(brick_length)
-            brick_components.append(brick_x_text)
-            brick_components.append(brick_width)
-            brick_components.append(brick_y_text)
-            brick_components.append(brick_height)
-            brick_components.append(brick_z_text)
 
         for x_stud in range(int(self.stud_x_counter)):
             for y_stud in range(0, int(self.stud_y_counter)):
