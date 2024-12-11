@@ -15,7 +15,7 @@ CALC_DEBUG = False
 STUD_DEBUG = True
 GRID_DEBUG = True
 BRICK_DEBUG = True
-STOP_DEBUG = False
+STOP_DEBUG = True
 
 
 # Expanding vector-class from vpython:
@@ -670,18 +670,24 @@ class RectangularBrick(BasicBrick):
                 )
                 brick_components.append(stud)
 
-        brick_compound = compound(brick_components, axis = NORTH, up = vector(0,0,1))
+        brick_compound = compound(brick_components)#, axis = NORTH, up = vector(0,0,1))
 
         print(brick_compound)
 
-        if GLOBAL_DEBUG and BRICK_DEBUG: print(f"Compound generated with:\n--------------------\npos: {brick_compound.pos} and l,w,h: {brick_compound.length}, {brick_compound.width}, {brick_compound.height}")
-        
+        if GLOBAL_DEBUG and BRICK_DEBUG: 
+            print(f"Compound generated with:\n--------------------\npos: {brick_compound.pos} and l,w,h: {brick_compound.length}, {brick_compound.width}, {brick_compound.height}")
+            print(f"--- axis: {brick_compound.axis}, up-vector: {brick_compound.up}")
+        stops = input("Weiter?")
         # 3. Rotate box according to orientation
         if GLOBAL_DEBUG and BRICK_DEBUG: print(f"Rotating brick at center point: {brick_compound.pos}")
         brick_compound.rotate(angle = self.orientation.rotation, axis = vector(0,0,1))
 
+        if STOP_DEBUG: stops = input("Weiter?")
+
         # 4. move box
-        if GLOBAL_DEBUG and BRICK_DEBUG: print(f"Moving box with x, y, z: {self.x}, {self.y}, {self.z} and l,w,h: {brick_compound.length}, {brick_compound.width}, {brick_compound.height}")
+        if GLOBAL_DEBUG and BRICK_DEBUG:
+            print(f"Moving box with x, y, z: {self.x}, {self.y}, {self.z} and l,w,h: {brick_compound.length}, {brick_compound.width}, {brick_compound.height}")
+            print(f"--- axis: {brick_compound.axis}, up-vector: {brick_compound.up}")
         if self.orientation == NORTH:
             brick_compound.pos = vector(
                 self.x + brick_compound.width / 2,
@@ -709,7 +715,7 @@ class RectangularBrick(BasicBrick):
 
         return brick_compound
 
-my_project = BrickProject("lego")
+my_project = BrickProject("duplo")
 my_project.add_scene()
 my_project.brick_scenes[0].add_baseplate(color.green * 0.4, 16, 20)
 
@@ -749,7 +755,7 @@ my_project.brick_scenes[0].add_baseplate(color.green * 0.4, 16, 20)
 # )
 
 my_project.brick_scenes[0].add_brick(
-    "rect", 4, 2, 1, 0, 0, 0, color.black, EAST
+    "rect", 4, 2, 1, 0, 0, 0, color.blue, EAST
 )
 
 x_marker = curve(pos=[vec(-15 * 9.6, 0, 0.5), vec(15 * 9.6, 0, 0.5)], color=color.yellow)
