@@ -1,12 +1,12 @@
 # brick-stack
 
-![hi-image displayed using bricks](/sample_img/hi-brick-stack.png)
+![hi-image displayed using bricks](/sample_img/hi-brick-stack2.png)
 
-Brick-stack is a tiny python-library-to-be, with two main intentions:
-1. function as a learning tool with realtime visual feedback to teach basic and advanced concepts of programming through brick layout
-2. create building plans for (simple) brick projects.
+brick-stack is a tiny python-library-to-be that allows you to display building bricks (e.g. lego/duplo) in a 3d-environment, and at the same time learn a lot about programming concepts. Its playful nature encourages students to "fiddle" and understand traditional and modern programming concepts (for beginners).
 
-Brick-stack uses VPython for rendering.
+![show-casing a duplo brick with x,y,z axes](/sample_img/duplo-with-axes.png)
+
+Brick-stack uses [VPython](https://vpython.org/) for rendering.
 
 # Participate
 If you are interested in developing this together, be it as a teacher, coder, beta-tester, reach out!
@@ -24,7 +24,7 @@ If you are interested in developing this together, be it as a teacher, coder, be
 - [ ] create CameraManager
 - [ ] rethink scene model
 - [ ] add alternative cli for easier use
-- [ ] 
+- [ ] implement proper linear algebra
 
 ## Usage
 ### Standard usage
@@ -43,6 +43,10 @@ If you are interested in developing this together, be it as a teacher, coder, be
         'rect', 4, 2, 1, 0, 0, 0, color.red
     )
     ```
+
+# What to expect?
+
+With brickstack, you can place and display building bricks in a 3d-environment. 
 
 # Learning to Code with Brick-Stack: A Comprehensive Guide
 

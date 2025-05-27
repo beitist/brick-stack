@@ -8,13 +8,31 @@ import random
 
 # Debug options
 # GLOBAL = Turn on/off all debug options
-GLOBAL_DEBUG = True
+GLOBAL_DEBUG = False
 
 # Turn on/off desired debug output
-CALC_DEBUG = True
+CALC_DEBUG = False
 STUD_DEBUG = False
 GRID_DEBUG = False
-BRICK_DEBUG = True
+BRICK_DEBUG = False
+STOP_DEBUG = False
+
+
+# Expanding vector-class from vpython:
+class DirectionalVector(vector):
+    @property
+    def rotation(self):
+        return {
+            (0,1,0): 0,      # North
+            (1,0,0): 3*pi/2, # East
+            (0,-1,0): pi,    # South
+            (-1,0,0): pi/2   # West
+        }[(self.x, self.y, self.z)]
+
+NORTH = DirectionalVector(0,1,0)
+EAST = DirectionalVector(1,0,0)
+SOUTH = DirectionalVector(0,-1,0)
+WEST = DirectionalVector(-1,0,0)
 
 ##### COORDINATES #####
 ## x = length from left to right (standard camera view)
@@ -23,6 +41,12 @@ BRICK_DEBUG = True
 ## coordinates x, y, z correspond with l, w, h values
 #######################
 
+##### COORDINATES (NEW) #####
+## length = typically the longer side of a brick (e.g. 4)
+## width = typically the shorter side of a brick (e.g. 2)
+## orientation = N, S, E, W aligning with length when placed
+## x/y = corner of smallest x/y-coordinate (placing a brick always from "lower/left", no matter the orientation)
+## z = either automatic or manual
 
 ####### TO DO ########
 ## 0: close scenes? update cameras?
@@ -41,14 +65,12 @@ class BrickProject:
     """Class holding individual scenes (= steps in constructing a brick project)
     
     Will (soon) provide functionality for file handling of simplified project files"""
-    # v0.1c / 17.11.24 / beiti
     # planned use:
-    # - load project file?
-    # - save renders?
-    #
+    # - load project file
+    # - save renders
     #
     # description
-    # type = duplo/lego
+    # brick_system = duplo/lego
     # auto_z = True // turn off by initialising project with auto_z = False
     
     def __init__(self, brick_system, auto_z = True):
@@ -61,7 +83,6 @@ class BrickProject:
         Additional Variables:
             brick_scenes (array): empty array to store brick_scenes (int-index)
         """
-
         self.brick_scenes = []
         self.brick_system = brick_system
         self.auto_z = auto_z        
@@ -84,7 +105,6 @@ class BrickProject:
             special_camera (obj): vpython-camera object, optional
             
         Scenes are appended to the brick_scene array."""
-        
         brick_scene = BrickScene(self, special_canvas, special_camera)
         self.brick_scenes.append(brick_scene)
 
@@ -109,7 +129,7 @@ class OccupancyGrid:
             height (int): see above
         """
         if GLOBAL_DEBUG and GRID_DEBUG: print(f"Function add_brick/OccupancyGrid: adding brick at ({x},{y}) with w={width}, l={length}")
-        # Für jeden Punkt, den der Stein belegt
+        # for every point occupied by a brick
         for dx in range(length):
             for dy in range(width):
                 point = (x + dx, y + dy)
@@ -129,8 +149,6 @@ class OccupancyGrid:
         # obtain max z
         for z_summary_of_coordinate in self.points:
             if GLOBAL_DEBUG and CALC_DEBUG: print(f"value {self.points[z_summary_of_coordinate]}, key: {z_summary_of_coordinate}")
-            # z_start_end = self.points[z_summary_of_coordinate]
-            
             for z_minmax_value in self.points[z_summary_of_coordinate]:
                 z_start, z_end = z_minmax_value
                 if z_start < min_z : min_z = z_start
@@ -154,7 +172,7 @@ class OccupancyGrid:
             "max_z" : max_z
         }
 
-        print(results)
+        if GLOBAL_DEBUG and CALC_DEBUG: print(results)
 
         return results
 
@@ -177,22 +195,9 @@ class OccupancyGrid:
 
 class BrickScene:
     """BrickScene is a functional container for individual brick scenes
-    and provides camera and scene settings
+    and provides orientation, camera and scene settings
     """
-    # v0.1 / 17.11.24 / beiti
-    # planned use:
-    # hold individual scenes consisting of multiple bricks + optional camera / render / view setting
-    # render full scene, possibly some more options
-    #
-    # to do:
-    # - camera object
-    # - camera calculation
-    # - special scenes
 
-    # Parameter description:
-    # special_camera = camera object for manual positioning of camera for scene
-    # special_scene = scene details (width, height, ...) -> new obect?
-    # brick_scene inherits type and project
     def __init__(self, project, special_scene=None, special_camera=None):
         """__init__ brick_scene
 
@@ -274,26 +279,47 @@ class BrickScene:
         current_canvas = canvas.get_selected()
         current_canvas.camera.pos = vector((max_x - dx/2) * self.bricks[-1].specs["xy_factor"], -30, 80)
 
-    def calculate_z_pos(self, length, width, height, x_pos, y_pos):
-       # Finde kleinstes mögliches z
-        z = self.grid.get_next_z(x_pos, y_pos, length, width)
-        # Runde auf nächste valide Höhe
+    def calculate_z_pos(self, length, width, height, x_pos, y_pos, orientation):
+        # Adjust dimensions based on orientation for correct collision detection
+        if orientation == NORTH or orientation == SOUTH:
+            grid_length = length
+            grid_width = width
+        else:  # EAST or WEST - dimensions are swapped
+            grid_length = width
+            grid_width = length
+            
+        # Find smallest possible z
+        z = self.grid.get_next_z(x_pos, y_pos, grid_width, grid_length)
+        # round up to next valid height
         if self.brick_system == "duplo":
-            # Runde auf Vielfaches von 0.5 (oder 3 in deinem System)
+            # round to multiples of 1/2
             if GLOBAL_DEBUG and (BRICK_DEBUG or GRID_DEBUG): print(f"z before rounding: {z}")
             z = ceil(z * 2) / 2
         else:  # lego
-            # Runde auf Vielfaches von 1/3
+            # round to multiples of 1/3
             z = ceil(z * 3) / 3
         return z
     
     def calculate_xyz_range(self):
         xyz_range = self.grid.get_xyz_range(self)       
 
-    def add_brick(self, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
+    def add_brick(self, brick_type : str = "rect", length : int = 4, width : int = 2, height : int = 1, x_pos : int = 0, y_pos : int = 0, z_pos : int = 0, brick_color : vector = color.red, brick_orientation : vector = NORTH):
+        """Add a new brick to your project/scene
+
+        Args:
+            brick_type (str): Choose from "rect" or "rect" ;-) - more to come
+            length (int): Length of the brick in number of studs (x-direction / "left to right")
+            width (int): Width in number of studs
+            height (int): Height in basic heights, use: .5, 1, 2 for duplo, .33, .66, 1, 2 for lego
+            x_pos (int): x-position of the left bottom corner (in North-orientation)
+            y_pos (int): see above
+            z_pos (int): see above
+            brick_color (vector): vector(r, g, b) or predefined color.x
+            brick_orientation (vector): NORTH, SOUTH, EAST, WEST
+        """
         # auto-z or not
         if self.project.auto_z:
-            z_pos = self.calculate_z_pos(length, width, height, x_pos, y_pos)
+            z_pos = self.calculate_z_pos(length, width, height, x_pos, y_pos, brick_orientation)
         else:
             z_pos = z_pos
         
@@ -309,12 +335,21 @@ class BrickScene:
                                           x_pos, 
                                           y_pos, 
                                           z_pos, 
-                                          brick_color)
+                                          brick_color,
+                                          brick_orientation)
         
         self.bricks.append(brick)
 
-        # add math model of brick to occupancy grid (for z-calculation)
-        self.grid.add_brick(x_pos, y_pos, z_pos, length, width, height)
+        # Add math model of brick to occupancy grid (for z-calculation)
+        # IMPORTANT: Adjust length/width based on orientation for correct collision detection
+        if brick_orientation == NORTH or brick_orientation == SOUTH:
+            grid_length = length
+            grid_width = width
+        else:  # EAST or WEST - dimensions are swapped
+            grid_length = width  # What was width becomes length in the grid
+            grid_width = length  # What was length becomes width in the grid
+            
+        self.grid.add_brick(x_pos, y_pos, z_pos, grid_length, grid_width, height)
 
         # update camera view
         self.update_camera_position()
@@ -322,14 +357,10 @@ class BrickScene:
     def get_my_scene_index(self):
         return self.project.get_scene_index(self)
 
+
 class BrickFactory:
-    # v0.1 / 16.11.24 / beiti
-    # generates bricks for scenes
-    
-    # space for many types of bricks
-    # needs failover if type is not implemented
     @staticmethod
-    def create_brick(brick_system, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color):
+    def create_brick(brick_system, brick_type, length, width, height, x_pos, y_pos, z_pos, brick_color, brick_orientation):
         if brick_color == "random":
             final_brick_color = BrickFactory.choose_random_color()
         else:
@@ -343,7 +374,8 @@ class BrickFactory:
                                      x_pos, 
                                      y_pos, 
                                      z_pos, 
-                                     final_brick_color)
+                                     final_brick_color,
+                                     brick_orientation)
         else:
             brick = RectangularBrick(brick_system,
                                      length, 
@@ -352,15 +384,14 @@ class BrickFactory:
                                      x_pos,
                                      y_pos, 
                                      z_pos, 
-                                     final_brick_color)
+                                     final_brick_color,
+                                     brick_orientation)
 
         return brick  
 
     @staticmethod
     def create_baseplate(brick_system, baseplate_color, baseplate_custom_length, baseplate_custom_width, baseplate_center_x, baseplate_center_y):
         # custom_x/y: center (standard: 0,0)
-        # specs = BasicBrick.BRICK_SPECS[brick_system]
-
         if GLOBAL_DEBUG and CALC_DEBUG: print(f"Baseplate values: x: {baseplate_center_x}, y: {baseplate_center_y}, length: {baseplate_custom_length}, width: {baseplate_custom_width}")
 
         baseplate = Baseplate(brick_system, baseplate_color, baseplate_custom_length, baseplate_custom_width, baseplate_center_x, baseplate_center_y)
@@ -375,9 +406,9 @@ class BrickFactory:
             vector: RGB-vector for use with vpython
         """
         random.seed()
-        red = random.randint(0, 10) / 10
-        green = random.randint(0, 10) / 10
-        blue = random.randint(0, 10) / 10
+        red = random.randint(0, 5) / 5
+        green = random.randint(0, 5) / 5
+        blue = random.randint(0, 5) / 5
 
         return vector(red, green, blue)
 
@@ -385,17 +416,12 @@ class BrickFactory:
 class BasicBrick:
     """Parent class for all bricks containing general information and a testing format
     """
-    # v0.1 / 11.11.24 / beiti
-    #
-    # PARAMETER:
-    # ==========
-    # brick_system = lego/duplo
-    # color = VPython color code
-    #
     # SPECS:
     # ======
     # generic lego/duplo for all bricks, in mm
+    # additional tools / info
 
+    # class variables for mm-dimensions
     BRICK_SPECS = {
         "lego": {
             "xy_factor": 7.8,
@@ -406,7 +432,8 @@ class BasicBrick:
             "stud_spacing": 7.8,
             "stud_wall_thickness": 0,
             "is_hollow": False,
-            "baseplate_height" : 0.15
+            "baseplate_height" : 0.15,
+            "baseplate_roundness" : 0.02
         },
 
         # due to likely render issues, stud diameter is reduced by half of wall thickness
@@ -419,7 +446,8 @@ class BasicBrick:
             "stud_spacing": 15.6,
             "stud_wall_thickness": 2.2,
             "is_hollow": True,
-            "baseplate_height" : 0.15           
+            "baseplate_height" : 0.15,
+            "baseplate_roundness" : 0.08          
         },
 
         "test": {
@@ -433,8 +461,6 @@ class BasicBrick:
             "is_hollow": False    
         }
     }
-
-    #brick_system = None
         
     def __init__(self, brick_system):
         """Parent brick class __init__
@@ -487,6 +513,7 @@ class BasicBrick:
  
         return generated_stud
 
+
 class Baseplate(BasicBrick):
     def __init__(self, brick_system, baseplate_color, baseplate_length : int = None, baseplate_width : int = None, baseplate_center_x : int = None, baseplate_center_y : int = None):
         super().__init__(brick_system)
@@ -525,85 +552,64 @@ class Baseplate(BasicBrick):
         self.lower_left_x = self.baseplate_center_x - self.baseplate_width * 0.5
         self.lower_left_y = self.baseplate_center_y - self.baseplate_length * 0.5
         # Keep to make baseplate a child of rectangularbrick later
-        self.lower_left_z = 0
+        self.lower_left_z = -0.15
 
         self.generate()
 
     def generate(self):
         # add baseplate to OccupancyGrid?
-        baseplate_linepath_z = [vec(0, 0, -0.15 * self.specs["xy_factor"]), 
+        # 1: extrude baseplate from shape
+        baseplate_linepath_z = [vec(0, 0, self.lower_left_z * self.specs["xy_factor"]), 
                                 vec(0, 0, 0)
         ]
         baseplate_shape = shapes.rectangle(
             pos=[self.baseplate_center_x, self.baseplate_center_y],
             width = self.baseplate_width,
-            height = self.baseplate_length
+            height = self.baseplate_length,
+            roundness = self.specs["baseplate_roundness"]
         )
         baseplate_extrusion = extrusion(
             shape = baseplate_shape,
             path = baseplate_linepath_z,
             color = self.brick_color
         )
-
         baseplate_compound = [baseplate_extrusion]
 
-        if GLOBAL_DEBUG and STUD_DEBUG: print(f"Before x/y for: stud_x_counter: {self.stud_x_counter}, stud_y_counter: {self.stud_y_counter}")
-
-        # duplo: corner-studs do not exist!
+        # 2: add studs
+        # duplo: corner-studs do not exist on baseplate
+        # duplo: baseplate studs are massive, not hollow
         for x_stud in (range(int(self.stud_x_counter))):
             for y_stud in (range(int(self.stud_y_counter))):
+                if (self.brick_system == "duplo" and 
+                    (x_stud == 0 or x_stud == int(self.stud_x_counter)-1) and 
+                    (y_stud == 0 or y_stud == int(self.stud_y_counter)-1)):
+                    pass
+                else:
+                    stud_center = vec(
+                        self.lower_left_x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"]),
+                        self.lower_left_y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"]),
+                        self.lower_left_z + self.height)
 
-                if GLOBAL_DEBUG and STUD_DEBUG:
-                    brick_center_x = self.baseplate_center_x
-                    brick_center_y = self.baseplate_center_y    
-                    
-                    stud_x = self.lower_left_x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"])
-                    stud_y = self.lower_left_y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"])
-                    
-                    print("Checking stud position in generate-call (3d) / BASEPLATE!")
-                    print(f"Brick center: ({brick_center_x}, {brick_center_y})")
-                    print(f"Stud position: ({stud_x}, {stud_y})")
+                    stud = self.generate_stud(
+                        pos = stud_center,
+                        hollow = False,
+                        wall_thickness = self.specs["stud_wall_thickness"]
+                    )
 
-                stud_center = vec(
-                    self.lower_left_x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"]),
-                    self.lower_left_y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"]),
-                    self.lower_left_z + self.height)
-
-                stud = self.generate_stud(
-                    pos = stud_center,
-                    hollow = self.specs["is_hollow"],
-                    wall_thickness = self.specs["stud_wall_thickness"]
-                )
-
-                baseplate_compound.append(stud)
+                    baseplate_compound.append(stud)
 
         return compound(baseplate_compound)
 
 
 class RectangularBrick(BasicBrick):
-    # v0.2a / 17.11.24 / beiti
-    #
-    # PARAMETER:
-    # ==========
-    # length, width, height = int
-    # x, y, z = int
-    # color = VPython Farbcode
-    # type = lego/duplo
-    # x = width
-    # y = length
-    #
-    #
-    # TO DO: 
-    #   - Unterseite vom Stein modellieren
-    #   - Farbcodes offener wählen, um Render-Engine flexibel zu halten
-    #   - Scene-Standardwerte an Klasse übergeben, sofern vorhanden
-    #   - Sonderformen definieren
-    #   - separate brick-objects from brick-renders (?)
-
-    def __init__(self, brick_system, length=4, width=2, height=1, x=0, y=0, z=0, brick_color=color.red):
+    def __init__(self, brick_system: str, length: int, width: int, height: int, 
+                 x: int, y: int, z: int, 
+                 brick_color: vector,
+                 orientation: vector):
         """Rectangular Brick __init__
 
         Generates a 3d-object of a rectangular brick with specified options.
+        Is usually called from scene.
 
         Args:
             brick_system (str): received from super; handed over from BrickProject
@@ -614,17 +620,19 @@ class RectangularBrick(BasicBrick):
             y (int, optional): Y-Position of front left corner of brick. Defaults to 0.
             z (int, optional): Z-Position of front left corner of brick. Defaults to 0.
             brick_color (vector or vpython color, optional): vector(R, G, B) or color.name (from vpython std). Defaults to color.red.
+            orientation (vector): user input to determine the orientation of the brick, use NORTH, EAST, SOUTH, WEST
         """
         super().__init__(brick_system)
-        self.stud_x_counter = length
-        self.stud_y_counter = width
+        self.stud_x_counter = width # x-axis in NORTH orientation (0,1,0)
+        self.stud_y_counter = length # y-axis in NORTH orientation
         self.length = length * self.specs["xy_factor"]
         self.width = width * self.specs["xy_factor"]
         self.height = height * self.specs["z_factor"]
         self.x = x * self.specs["xy_factor"]
         self.y = y * self.specs["xy_factor"]
         self.z = z * self.specs["z_factor"]
-        self.brick_color=brick_color
+        self.brick_color = brick_color
+        self.orientation = orientation
 
         self.generate()
 
@@ -638,17 +646,14 @@ class RectangularBrick(BasicBrick):
             compound (obj::vpython): 3d compound representing the rendered brick
         """
         if GLOBAL_DEBUG and (STUD_DEBUG or BRICK_DEBUG): 
-            print(f"Generating 3d-brick:\nX: {self.x}, Y: {self.y}, Z: {self.z}")
+            print(f"Generating 3d-brick:\n-------------------\nX: {self.x}, Y: {self.y}, Z: {self.z}")
             print(f'length: {self.length}, width: {self.width}, height: {self.height}')
             print(f"stud-x-counter: {self.stud_x_counter}, stud-y-counter: {self.stud_y_counter}")
         
+        # 1. Create box at origin in NORTH orientation first
         brick_basis = box(
-            pos = vec(
-                self.x + self.length/2, 
-                self.y + self.width/2, 
-                self.z + self.height/2
-            ),
-            axis = vector(1,0,0),
+            pos = vec(0, 0, 0),  # Create at origin
+            axis = vector(0,1,0), # North orientation  
             length = self.length,
             height = self.height,
             width = self.width,
@@ -657,57 +662,113 @@ class RectangularBrick(BasicBrick):
         )
 
         brick_components = [brick_basis]
+
+        # 2. Add studs relative to brick center (at origin)
         for x_stud in range(int(self.stud_x_counter)):
-            for y_stud in range(0, int(self.stud_y_counter)):
-
-                if GLOBAL_DEBUG and STUD_DEBUG:
-                    brick_center_x = self.x + self.length/2
-                    brick_center_y = self.y + self.width/2     
-                    
-                    stud_x = self.x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"])
-                    stud_y = self.y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"])
-                    
-                    print("Checking stud position in generate-call (3d)")
-                    print(f"Brick center: ({brick_center_x}, {brick_center_y})")
-                    print(f"Stud position: ({stud_x}, {stud_y})")
-
+            for y_stud in range(int(self.stud_y_counter)):
                 stud_center = vec(
-                    self.x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"]),
-                    self.y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"]),
-                    self.z + self.height)
-
+                    -self.width/2 + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"]),
+                    -self.length/2 + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"]),
+                    self.height/2
+                )
                 stud = self.generate_stud(
                     pos = stud_center,
                     hollow = self.specs["is_hollow"],
                     wall_thickness = self.specs["stud_wall_thickness"]
                 )
-
                 brick_components.append(stud)
 
-        return compound(brick_components)
+        # 3. Create compound
+        brick_compound = compound(brick_components)
 
-my_project = BrickProject("lego")
+        # 4. Rotate if needed
+        rotation_angle = self.orientation.rotation
+        if rotation_angle != 0:
+            brick_compound.rotate(angle=rotation_angle, axis=vector(0,0,1))
+
+        # 5. Calculate final position based on orientation
+        if self.orientation == NORTH:
+            final_pos = vector(
+                self.x + self.width/2, 
+                self.y + self.length/2, 
+                self.z + self.height/2
+            )
+        elif self.orientation == EAST:
+            final_pos = vector(
+                self.x + self.length/2,  # Swapped because of rotation
+                self.y + self.width/2, 
+                self.z + self.height/2
+            )
+        elif self.orientation == SOUTH:
+            final_pos = vector(
+                self.x + self.width/2, 
+                self.y + self.length/2, 
+                self.z + self.height/2
+            )
+        elif self.orientation == WEST:
+            final_pos = vector(
+                self.x + self.length/2,  # Swapped because of rotation
+                self.y + self.width/2, 
+                self.z + self.height/2
+            )
+
+        # 6. Move to final position
+        brick_compound.pos = final_pos
+
+        if GLOBAL_DEBUG and BRICK_DEBUG: 
+            print(f"Final compound pos: {brick_compound.pos}")
+
+        return brick_compound
+
+my_project = BrickProject("duplo")
 my_project.add_scene()
 my_project.brick_scenes[0].add_baseplate(color.green * 0.4, 16, 20)
 
-def hello_world():
-    my_project.brick_scenes[0].add_brick(
-        "rect", 1, 8, 1, -5, -2, 0, color.black 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 1, 8, 1, -2, -2, 0, color.black 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 2, 1, 1, -4, 1, 0, color.black 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 1, 8, 1, 0, -2, 0, color.black 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 1, 6, 1, 2, 0, 0, color.black 
-    )
-    my_project.brick_scenes[0].add_brick(
-        "rect", 1, 1, 1, 2, -2, 0, color.black 
-    )
+# def hello_world():
+#     my_project.brick_scenes[0].add_brick(
+#         "rect", 8, 1, 1, -5, -2, 0, color.black, EAST
+#     )
+#     my_project.brick_scenes[0].add_brick(
+#         "rect", 8, 1, 1, -2, -2, 0, color.black, EAST 
+#     )
+#     my_project.brick_scenes[0].add_brick(
+    #     "rect", 2, 1, 1, -4, 1, 0, color.black 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 1, 8, 1, 0, -2, 0, color.black 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 1, 6, 1, 2, 0, 0, color.black 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 1, 1, 1, 2, -2, 0, color.black 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 8, 1, 1, -5, -4, 0, color.red 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 8, 1, 1, -5, -5, 0, color.yellow 
+    # )
+    # my_project.brick_scenes[0].add_brick(
+    #     "rect", 8, 1, 1, -5, -6, 0, color.blue 
+    # )
 
-hello_world()
+# hello_world()
+
+# my_project.brick_scenes[0].add_brick(
+#         "rect", 8, 2, 1, 0, 0, 0, color.black, NORTH
+# )
+
+my_project.brick_scenes[0].add_brick(
+    "rect", 4, 2, 1, 0, 0, 0, color.blue, EAST
+)
+
+x_marker = curve(pos=[vec(-15 * 9.6, 0, 0.5), vec(15 * 9.6, 0, 0.5)], color=color.yellow)
+y_marker = curve(pos=[vec(0, -15 * 9.6, 0.5), vec(0, 15 * 9.6, 0.5)], color=color.blue)
+z_marker = curve(pos=[vec(0, 0, -15 * 9.6), vec(0, 0, 15 * 9.6)], color=color.red)
+x_text = label(pos=vec(-8 * 9.6, 0, 0.5), text='x-axis', xoffset=-1 * 9.6, yoffset= 2 * 9.6, space= 3, height= 16, border=4, font='sans', background = color.white, color = color.black)
+y_text = label(pos=vec(0, -8 * 9.6, 0.5), text='y-axis', xoffset=-1 * 9.6, yoffset= 2 * 9.6, space= 3, height= 16, border=4, font='sans', background = color.white, color = color.black)
+
+
+my_project.brick_scenes[0].bricks.append(x_marker)
+my_project.brick_scenes[0].bricks.append(y_marker)
