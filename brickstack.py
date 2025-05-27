@@ -8,14 +8,14 @@ import random
 
 # Debug options
 # GLOBAL = Turn on/off all debug options
-GLOBAL_DEBUG = True
+GLOBAL_DEBUG = False
 
 # Turn on/off desired debug output
 CALC_DEBUG = False
-STUD_DEBUG = True
-GRID_DEBUG = True
-BRICK_DEBUG = True
-STOP_DEBUG = True
+STUD_DEBUG = False
+GRID_DEBUG = False
+BRICK_DEBUG = False
+STOP_DEBUG = False
 
 
 # Expanding vector-class from vpython:
@@ -279,9 +279,17 @@ class BrickScene:
         current_canvas = canvas.get_selected()
         current_canvas.camera.pos = vector((max_x - dx/2) * self.bricks[-1].specs["xy_factor"], -30, 80)
 
-    def calculate_z_pos(self, length, width, height, x_pos, y_pos):
-       # Find smallest possible z
-        z = self.grid.get_next_z(x_pos, y_pos, length, width)
+    def calculate_z_pos(self, length, width, height, x_pos, y_pos, orientation):
+        # Adjust dimensions based on orientation for correct collision detection
+        if orientation == NORTH or orientation == SOUTH:
+            grid_length = length
+            grid_width = width
+        else:  # EAST or WEST - dimensions are swapped
+            grid_length = width
+            grid_width = length
+            
+        # Find smallest possible z
+        z = self.grid.get_next_z(x_pos, y_pos, grid_width, grid_length)
         # round up to next valid height
         if self.brick_system == "duplo":
             # round to multiples of 1/2
@@ -311,7 +319,7 @@ class BrickScene:
         """
         # auto-z or not
         if self.project.auto_z:
-            z_pos = self.calculate_z_pos(length, width, height, x_pos, y_pos)
+            z_pos = self.calculate_z_pos(length, width, height, x_pos, y_pos, brick_orientation)
         else:
             z_pos = z_pos
         
@@ -332,8 +340,16 @@ class BrickScene:
         
         self.bricks.append(brick)
 
-        # add math model of brick to occupancy grid (for z-calculation)
-        self.grid.add_brick(x_pos, y_pos, z_pos, length, width, height)
+        # Add math model of brick to occupancy grid (for z-calculation)
+        # IMPORTANT: Adjust length/width based on orientation for correct collision detection
+        if brick_orientation == NORTH or brick_orientation == SOUTH:
+            grid_length = length
+            grid_width = width
+        else:  # EAST or WEST - dimensions are swapped
+            grid_length = width  # What was width becomes length in the grid
+            grid_width = length  # What was length becomes width in the grid
+            
+        self.grid.add_brick(x_pos, y_pos, z_pos, grid_length, grid_width, height)
 
         # update camera view
         self.update_camera_position()
@@ -634,20 +650,10 @@ class RectangularBrick(BasicBrick):
             print(f'length: {self.length}, width: {self.width}, height: {self.height}')
             print(f"stud-x-counter: {self.stud_x_counter}, stud-y-counter: {self.stud_y_counter}")
         
-        # 1. create box in standard orientation (North)
-        #### this is important for irregular boxes where North ≠ South
-        #### NOTICE: vpython compounds ALWAYS end up with:
-        #### axis = (x,0,0) and up = (0,y,0) with unclear dimensions, 
-        #### although they don't matter.
-        #### This does affect the length, width, height info:
-        #### 
+        # 1. Create box at origin in NORTH orientation first
         brick_basis = box(
-            pos = vec(
-                self.x + self.width/2, 
-                self.y + self.length/2, 
-                self.z + self.height/2
-            ),
-            axis = vector(0,1,0), # follows length
+            pos = vec(0, 0, 0),  # Create at origin
+            axis = vector(0,1,0), # North orientation  
             length = self.length,
             height = self.height,
             width = self.width,
@@ -655,27 +661,15 @@ class RectangularBrick(BasicBrick):
             up = vector(0,0,1)
         )
 
-        if GLOBAL_DEBUG and BRICK_DEBUG: 
-            print(f"Box generated with:\n-------------------\npos: {brick_basis.pos}\nand l,w,h: {brick_basis.length}, {brick_basis.width}, {brick_basis.height}")
-            print(f"Self remains with: x,y,z: {self.x}, {self.y}, {self.z}; stud-spacing: {self.specs["stud_spacing"]}, first stud x: {self.x + self.specs["stud_xy_offset"] + (0 * self.specs["stud_spacing"])}")
-            if STOP_DEBUG: temp_in = input("Weiter.")
-
         brick_components = [brick_basis]
 
-        if GLOBAL_DEBUG and BRICK_DEBUG:
-            brick_length = curve(pos=[vec(0, self.y, 0), vec(0, self.length, 0)], color=color.yellow)
-            brick_width = curve(pos=[vec(self.x, 0, 0), vec(self.width, 0, 0)], color=color.yellow)
-            brick_height = curve(pos=[vec(0, 0, self.z), vec(0, 0, self.height)], color=color.yellow)
-            brick_x_text = label(pos=vec(self.width/2, -5, 5), text='width', xoffset=-1, yoffset= 2, space= 2, height= 16, border=4, font='sans', background = color.white, color = color.black)
-            brick_y_text = label(pos=vec(-5, self.length/2, 5), text='length', xoffset=-1, yoffset= 2, space= 2, height= 16, border=4, font='sans', background = color.white, color = color.black)
-            brick_z_text = label(pos=vec(-5, 5, self.height/2), text='height', xoffset=-1, yoffset= 2, space= 2, height= 16, border=4, font='sans', background = color.white, color = color.black)
-
+        # 2. Add studs relative to brick center (at origin)
         for x_stud in range(int(self.stud_x_counter)):
-            for y_stud in range(0, int(self.stud_y_counter)):
+            for y_stud in range(int(self.stud_y_counter)):
                 stud_center = vec(
-                    self.x + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"]),
-                    self.y + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"]),
-                    self.z + self.height
+                    -self.width/2 + self.specs["stud_xy_offset"] + (x_stud * self.specs["stud_spacing"]),
+                    -self.length/2 + self.specs["stud_xy_offset"] + (y_stud * self.specs["stud_spacing"]),
+                    self.height/2
                 )
                 stud = self.generate_stud(
                     pos = stud_center,
@@ -684,49 +678,45 @@ class RectangularBrick(BasicBrick):
                 )
                 brick_components.append(stud)
 
-        brick_compound = compound(brick_components)#, axis = NORTH, up = vector(0,0,1))
+        # 3. Create compound
+        brick_compound = compound(brick_components)
 
-        print(brick_compound)
+        # 4. Rotate if needed
+        rotation_angle = self.orientation.rotation
+        if rotation_angle != 0:
+            brick_compound.rotate(angle=rotation_angle, axis=vector(0,0,1))
 
-        if GLOBAL_DEBUG and BRICK_DEBUG: 
-            print(f"Compound generated with:\n--------------------\npos: {brick_compound.pos} and l,w,h: {brick_compound.length}, {brick_compound.width}, {brick_compound.height}")
-            print(f"--- axis: {brick_compound.axis}, up-vector: {brick_compound.up}")
-        stops = input("Weiter?")
-        # 3. Rotate box according to orientation
-        if GLOBAL_DEBUG and BRICK_DEBUG: print(f"Rotating brick at center point: {brick_compound.pos}")
-        brick_compound.rotate(angle = self.orientation.rotation, axis = vector(0,0,1))
-
-        if STOP_DEBUG: stops = input("Weiter?")
-
-        # 4. move box
-
-        if GLOBAL_DEBUG and BRICK_DEBUG:
-            print(f"Moving box with x, y, z: {self.x}, {self.y}, {self.z} and l,w,h: {brick_compound.length}, {brick_compound.width}, {brick_compound.height}")
-            print(f"--- axis: {brick_compound.axis}, up-vector: {brick_compound.up}")
+        # 5. Calculate final position based on orientation
         if self.orientation == NORTH:
-            brick_compound.pos = vector(
-                self.x + brick_compound.width / 2,
-                self.y + brick_compound.length / 2,
-                self.z + brick_compound.height / 2
+            final_pos = vector(
+                self.x + self.width/2, 
+                self.y + self.length/2, 
+                self.z + self.height/2
             )
         elif self.orientation == EAST:
-            brick_compound.pos = vector(
-                self.x + brick_compound.width / 2,
-                self.y + brick_compound.length / 2,
-                self.z + brick_compound.height / 2
+            final_pos = vector(
+                self.x + self.length/2,  # Swapped because of rotation
+                self.y + self.width/2, 
+                self.z + self.height/2
             )
         elif self.orientation == SOUTH:
-            brick_compound.pos = vector(
-                self.x + brick_compound.width / 2,
-                self.y + brick_compound.length / 2,
-                self.z + brick_compound.height / 2
+            final_pos = vector(
+                self.x + self.width/2, 
+                self.y + self.length/2, 
+                self.z + self.height/2
             )
         elif self.orientation == WEST:
-            brick_compound.pos = vector(
-                self.x + brick_compound.width / 2,
-                self.y + brick_compound.length / 2,
-                self.z + brick_compound.height / 2
+            final_pos = vector(
+                self.x + self.length/2,  # Swapped because of rotation
+                self.y + self.width/2, 
+                self.z + self.height/2
             )
+
+        # 6. Move to final position
+        brick_compound.pos = final_pos
+
+        if GLOBAL_DEBUG and BRICK_DEBUG: 
+            print(f"Final compound pos: {brick_compound.pos}")
 
         return brick_compound
 
